@@ -47,10 +47,10 @@ postgres = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/mtgas"
-Documentation = "https://github.com/yourusername/mtgas/docs"
-Repository = "https://github.com/yourusername/mtgas"
-Issues = "https://github.com/yourusername/mtgas/issues"
+Homepage = "https://github.com/why-pengo/mtgas"
+Documentation = "https://github.com/why-pengo/mtgas/docs"
+Repository = "https://github.com/why-pengo/mtgas"
+Issues = "https://github.com/why-pengo/mtgas/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

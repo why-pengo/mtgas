@@ -386,7 +386,7 @@ class MTGALogParser:
         game_objects = game_state.get('gameObjects', [])
         for obj in game_objects:
             instance_id = obj.get('instanceId')
-            if instance_id:
+            if instance_id is not None:
                 self.current_match.card_instances[instance_id] = {
                     'grp_id': obj.get('grpId'),
                     'name': obj.get('name'),

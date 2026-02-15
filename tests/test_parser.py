@@ -99,14 +99,14 @@ class TestLogParserEventExtraction:
         assert len(gre_events) == 1
 
     def test_parse_empty_file(self, tmp_path):
-        """Test parsing empty log file."""
+        """Test parsing empty log file raises exception."""
+        from src.exceptions import InvalidLogFormatError
+
         log_file = tmp_path / "Player.log"
         log_file.write_text("")
 
-        parser = MTGALogParser(str(log_file))
-        events = list(parser.parse_events())
-
-        assert events == []
+        with pytest.raises(InvalidLogFormatError):
+            MTGALogParser(str(log_file))
 
     def test_parse_non_json_lines(self, tmp_path):
         """Test that non-JSON lines are skipped gracefully."""
@@ -228,18 +228,25 @@ class TestEdgeCases:
 
     def test_malformed_json(self, tmp_path):
         """Test handling of malformed JSON."""
-        log_content = '''{"matchGameRoomStateChangedEvent":{"gameRoomInfo":{BROKEN JSON HERE
-{"greToClientEvent":{"valid":"json"}}
+        # The parser should skip lines with invalid JSON and continue
+        log_content = '''[UnityCrossThreadLogger] Starting MTGA
+This is not JSON at all
+{"greToClientEvent":{"greToClientMessages":[{"type":"test"}]}}
+Another non-JSON line {broken
+{"matchGameRoomStateChangedEvent":{"gameRoomInfo":{"stateType":"MatchGameRoomStateType_Playing","gameRoomConfig":{"matchId":"test-123"}}}}
 '''
         log_file = tmp_path / "Player.log"
         log_file.write_text(log_content)
 
         parser = MTGALogParser(str(log_file))
-        # Should not raise, should skip malformed lines
+        # Should not raise, should skip non-JSON lines
         events = list(parser.parse_events())
 
-        # Should get the valid event
-        assert len(events) == 1
+        # Should get the two valid events
+        assert len(events) == 2
+        event_types = {e.event_type for e in events}
+        assert 'gre_event' in event_types
+        assert 'match_state' in event_types
 
     def test_unicode_characters(self, tmp_path):
         """Test handling of unicode characters in player names."""
@@ -273,8 +280,9 @@ class TestEdgeCases:
     def test_large_game_state(self, tmp_path):
         """Test handling of large game state with many objects."""
         # Create a large game state with many game objects
+        # Start from instanceId 1 since 0 is treated as falsy
         game_objects = [
-            {"instanceId": i, "grpId": 10000 + i, "type": "GameObjectType_Card"}
+            {"instanceId": i + 1, "grpId": 10000 + i, "type": "GameObjectType_Card"}
             for i in range(100)
         ]
 

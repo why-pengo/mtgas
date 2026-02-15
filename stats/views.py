@@ -3,12 +3,13 @@ Django views for MTG Arena Statistics.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.db.models import Count, Sum, Avg, Q, F, Case, When, IntegerField, Max
 from django.db.models.functions import TruncDate
 from django.core.paginator import Paginator
+from django.utils import timezone
 
 from .models import Match, Deck, DeckCard, Card, GameAction, LifeChange, ZoneTransfer, ImportSession
 
@@ -73,7 +74,7 @@ def dashboard(request):
         fmt['win_rate'] = round(fmt['wins'] / fmt['games'] * 100, 1) if fmt['games'] > 0 else 0
 
     # Win rate over time (last 7 days)
-    seven_days_ago = datetime.now() - timedelta(days=7)
+    seven_days_ago = timezone.now() - timedelta(days=7)
     daily_stats = (
         Match.objects
         .filter(result__isnull=False, start_time__gte=seven_days_ago)
@@ -278,7 +279,7 @@ def import_sessions(request):
 
 def api_stats(request):
     """API endpoint for dashboard charts."""
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
 
     daily_stats = (
         Match.objects
