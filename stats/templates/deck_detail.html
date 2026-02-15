@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}{{ deck.name }} - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'stats:decks' %}">Decks</a></li>
+        <li class="breadcrumb-item active">{{ deck.name }}</li>
+    </ol>
+</nav>
+
+<h1 class="mb-4">{{ deck.name }}</h1>
+
+<div class="row">
+    <!-- Stats Overview -->
+    <div class="col-md-8 mb-4">
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value">{{ stats.games }}</div>
+                    <div class="stat-label">Games</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value">{{ stats.wins }}</div>
+                    <div class="stat-label">Wins</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value">{{ stats.win_rate }}%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value">{{ stats.avg_turns|floatformat:1|default:"-" }}</div>
+                    <div class="stat-label">Avg Turns</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mana Curve -->
+        <div class="card mb-4">
+            <div class="card-header">Mana Curve</div>
+            <div class="card-body">
+                <div id="manaCurveChart"></div>
+            </div>
+        </div>
+
+        <!-- Color Distribution -->
+        {% if color_counts %}
+        <div class="card mb-4">
+            <div class="card-header">Color Distribution</div>
+            <div class="card-body">
+                <div id="colorDistChart"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Matchups -->
+        {% if matchups %}
+        <div class="card">
+            <div class="card-header">Opponent Matchups</div>
+            <div class="card-body">
+                <div id="matchupsChart"></div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Deck List -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Deck List
+                <span class="badge bg-secondary float-end">{{ deck.format|default:"Unknown" }}</span>
+            </div>
+            <div class="card-body">
+                {% for category, cards in cards_by_type.items %}
+                <h6 class="mt-3">{{ category }} ({{ cards|length }})</h6>
+                {% for item in cards %}
+                <div class="small">
+                    {{ item.quantity }}x {{ item.card.name|default:"Unknown" }}
+                    <span class="text-muted">{{ item.card.mana_cost }}</span>
+                </div>
+                {% endfor %}
+                {% empty %}
+                <p class="text-muted">No card data available</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mana Curve
+    const manaCurve = {{ mana_curve|safe }};
+    MTGACharts.manaCurveChart('#manaCurveChart', manaCurve);
+
+    // Color Distribution
+    const colorCounts = {{ color_counts|safe }};
+    if (Object.keys(colorCounts).length > 0) {
+        MTGACharts.colorDistributionChart('#colorDistChart', colorCounts);
+    }
+
+    // Matchups Win Rate
+    const matchups = [
+        {% for m in matchups %}
+        {label: "{{ m.opponent_name|escapejs }}", wins: {{ m.wins }}, losses: {{ m.games }} - {{ m.wins }}, games: {{ m.games }}},
+        {% endfor %}
+    ];
+    if (matchups.length > 0) {
+        MTGACharts.winRateBarChart('#matchupsChart', matchups);
+    }
+});
+</script>
+{% endblock %}

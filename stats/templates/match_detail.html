@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Match Details - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'stats:matches' %}">Matches</a></li>
+        <li class="breadcrumb-item active">{{ match.match_id|slice:":8" }}...</li>
+    </ol>
+</nav>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="{{ match.result }}">
+            {% if match.result == 'win' %}✓ Victory{% elif match.result == 'loss' %}✗ Defeat{% else %}{{ match.result|default:"Incomplete" }}{% endif %}
+            vs {{ match.opponent_name|default:"Unknown" }}
+        </h1>
+        <p class="text-muted">
+            {{ match.start_time|date:"F d, Y H:i"|default:"Unknown date" }}
+            {% if match.duration_display %}• {{ match.duration_display }}{% endif %}
+            • {{ match.total_turns|default:"?" }} turns
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Match Info -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">Match Info</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th>Match ID</th>
+                        <td><small>{{ match.match_id }}</small></td>
+                    </tr>
+                    <tr>
+                        <th>Format</th>
+                        <td>{{ match.event_id|default:"-" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Deck</th>
+                        <td>
+                            {% if match.deck %}
+                            <a href="{% url 'stats:deck_detail' match.deck.id %}">{{ match.deck.name }}</a>
+                            {% else %}
+                            Unknown
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Player</th>
+                        <td>{{ match.player_name|default:"You" }} (Seat {{ match.player_seat_id|default:"?" }})</td>
+                    </tr>
+                    <tr>
+                        <th>Opponent</th>
+                        <td>{{ match.opponent_name|default:"Unknown" }} (Seat {{ match.opponent_seat_id|default:"?" }})</td>
+                    </tr>
+                    {% if match.winning_reason %}
+                    <tr>
+                        <th>Win Reason</th>
+                        <td>{{ match.winning_reason }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        {% if deck_cards %}
+        <div class="card mt-3">
+            <div class="card-header">Deck Used</div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <small>
+                {% for dc in deck_cards %}
+                <div>{{ dc.quantity }}x {{ dc.card.name|default:"Unknown" }}</div>
+                {% endfor %}
+                </small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Game Timeline -->
+    <div class="col-md-8 mb-4">
+        {% if life_changes %}
+        <div class="card mb-3">
+            <div class="card-header">Life Totals</div>
+            <div class="card-body">
+                <div id="lifeChart"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">Game Timeline</div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% regroup actions by turn_number as turns %}
+                {% for turn in turns %}
+                <div class="mb-3">
+                    <h6 class="border-bottom pb-1">Turn {{ turn.grouper|default:"?" }}</h6>
+                    {% for action in turn.list %}
+                    <div class="small mb-1 ps-2">
+                        <span class="{% if action.seat_id == match.player_seat_id %}text-info{% else %}text-warning{% endif %}">
+                            {% if action.seat_id == match.player_seat_id %}You{% else %}Opponent{% endif %}
+                        </span>
+                        - {{ action.action_type|slice:"11:" }}
+                        {% if action.card %}
+                        <strong>{{ action.card.name }}</strong>
+                        {% endif %}
+                        <span class="text-muted">({{ action.phase|slice:"6:"|default:"" }})</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% empty %}
+                <p class="text-muted">No action data available</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if life_changes %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lifeChanges = [
+        {% for lc in life_changes %}
+        {turn: {{ lc.turn_number|default:0 }}, seat: {{ lc.seat_id }}, life: {{ lc.life_total }}},
+        {% endfor %}
+    ];
+
+    const playerSeat = {{ match.player_seat_id|default:2 }};
+
+    // Process life changes into time series
+    const turns = [...new Set(lifeChanges.map(lc => lc.turn))].sort((a,b) => a-b);
+    let lastPlayerLife = 20, lastOppLife = 20;
+    const data = [];
+
+    turns.forEach(turn => {
+        const turnChanges = lifeChanges.filter(lc => lc.turn === turn);
+        turnChanges.forEach(lc => {
+            if (lc.seat === playerSeat) lastPlayerLife = lc.life;
+            else lastOppLife = lc.life;
+        });
+        data.push({turn, playerLife: lastPlayerLife, oppLife: lastOppLife});
+    });
+
+    if (data.length === 0) return;
+
+    // Create D3 line chart for life totals
+    const container = d3.select('#lifeChart');
+    const margin = {top: 20, right: 30, bottom: 30, left: 40};
+    const width = container.node().getBoundingClientRect().width - margin.left - margin.right;
+    const height = 180 - margin.top - margin.bottom;
+
+    const svg = container.append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.turn)])
+        .range([0, width]);
+
+    const y = d3.scaleLinear()
+        .domain([0, Math.max(d3.max(data, d => Math.max(d.playerLife, d.oppLife)), 20) * 1.1])
+        .range([height, 0]);
+
+    // Grid
+    svg.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisLeft(y).tickSize(-width).tickFormat(''))
+        .selectAll('line')
+        .style('stroke', 'rgba(255,255,255,0.1)');
+
+    // Player life line
+    const playerLine = d3.line()
+        .x(d => x(d.turn))
+        .y(d => y(d.playerLife))
+        .curve(d3.curveStepAfter);
+
+    svg.append('path')
+        .datum(data)
+        .attr('fill', 'none')
+        .attr('stroke', '#4caf50')
+        .attr('stroke-width', 2)
+        .attr('d', playerLine);
+
+    // Opponent life line
+    const oppLine = d3.line()
+        .x(d => x(d.turn))
+        .y(d => y(d.oppLife))
+        .curve(d3.curveStepAfter);
+
+    svg.append('path')
+        .datum(data)
+        .attr('fill', 'none')
+        .attr('stroke', '#f44336')
+        .attr('stroke-width', 2)
+        .attr('d', oppLine);
+
+    // Axes
+    svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(Math.min(data.length, 10)).tickFormat(d => 'T' + d))
+        .selectAll('text')
+        .attr('fill', '#888');
+
+    svg.append('g')
+        .call(d3.axisLeft(y).ticks(5))
+        .selectAll('text')
+        .attr('fill', '#888');
+
+    // Legend
+    svg.append('circle').attr('cx', width - 100).attr('cy', 10).attr('r', 5).attr('fill', '#4caf50');
+    svg.append('text').attr('x', width - 90).attr('y', 14).attr('fill', '#888').attr('font-size', '11px').text('You');
+    svg.append('circle').attr('cx', width - 50).attr('cy', 10).attr('r', 5).attr('fill', '#f44336');
+    svg.append('text').attr('x', width - 40).attr('y', 14).attr('fill', '#888').attr('font-size', '11px').text('Opponent');
+});
+</script>
+{% endif %}
+{% endblock %}

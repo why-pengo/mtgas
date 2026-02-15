@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Import Sessions - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Import Sessions</h1>
+
+<div class="card mb-4">
+    <div class="card-header">How to Import</div>
+    <div class="card-body">
+        <p>To import your game data, run the following command after your gaming session:</p>
+        <pre class="bg-dark p-3 rounded"><code>python manage.py import_log /path/to/Player.log</code></pre>
+        <p class="mb-0 text-muted">
+            <strong>First time?</strong> Download card data first:
+            <code>python manage.py download_cards</code>
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Recent Imports</div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Matches Imported</th>
+                    <th>Matches Skipped</th>
+                    <th>Log File</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.started_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        {% if session.status == 'completed' %}
+                        <span class="badge bg-success">{{ session.status }}</span>
+                        {% elif session.status == 'failed' %}
+                        <span class="badge bg-danger">{{ session.status }}</span>
+                        {% elif session.status == 'running' %}
+                        <span class="badge bg-warning">{{ session.status }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ session.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ session.matches_imported }}</td>
+                    <td>{{ session.matches_skipped }}</td>
+                    <td><small>{{ session.log_file|truncatechars:50 }}</small></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">No import sessions yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

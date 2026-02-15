@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Decks - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Deck Performance</h1>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Deck Name</th>
+                    <th>Format</th>
+                    <th>Games</th>
+                    <th>Wins</th>
+                    <th>Win Rate</th>
+                    <th>Last Played</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for deck in decks %}
+                <tr>
+                    <td>
+                        <a href="{% url 'stats:deck_detail' deck.id %}">{{ deck.name }}</a>
+                    </td>
+                    <td>{{ deck.format|default:"-" }}</td>
+                    <td>{{ deck.games }}</td>
+                    <td>{{ deck.wins }}</td>
+                    <td>
+                        {% if deck.games > 0 %}
+                        <div class="progress" style="height: 20px; min-width: 100px;">
+                            <div class="progress-bar {% if deck.win_rate >= 50 %}bg-success{% else %}bg-danger{% endif %}"
+                                 style="width: {{ deck.win_rate }}%">
+                                {{ deck.win_rate }}%
+                            </div>
+                        </div>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ deck.last_played|date:"M d, Y"|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No decks found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

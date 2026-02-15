@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Dashboard</h1>
+
+<!-- Overall Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-value">{{ overall_stats.total_matches }}</div>
+            <div class="stat-label">Total Matches</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-value">{{ overall_stats.wins }}-{{ overall_stats.losses }}</div>
+            <div class="stat-label">Win-Loss Record</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-value">{{ overall_stats.win_rate }}%</div>
+            <div class="stat-label">Win Rate</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-value">{{ overall_stats.avg_turns|floatformat:1 }}</div>
+            <div class="stat-label">Avg Turns/Game</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Win Rate Chart -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header">Win Rate Over Time (Last 7 Days)</div>
+            <div class="card-body">
+                <div id="winRateTimeChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Format Stats -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">Performance by Format</div>
+            <div class="card-body">
+                {% if format_stats %}
+                <div id="formatWinRateChart"></div>
+                {% else %}
+                <p class="text-muted">No data yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Deck Usage Pie Chart -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">Deck Usage</div>
+            <div class="card-body">
+                {% if deck_stats %}
+                <div id="deckUsageChart"></div>
+                {% else %}
+                <p class="text-muted">No data yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Matches -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">Recent Matches</div>
+            <div class="card-body">
+                {% if recent_matches %}
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Result</th>
+                            <th>Opponent</th>
+                            <th>Deck</th>
+                            <th>Turns</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for match in recent_matches %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'stats:match_detail' match.id %}"
+                                   class="{{ match.result }}">
+                                    {% if match.result == 'win' %}✓{% elif match.result == 'loss' %}✗{% else %}?{% endif %}
+                                    {{ match.result|default:"?" }}
+                                </a>
+                            </td>
+                            <td>{{ match.opponent_name|default:"Unknown" }}</td>
+                            <td>{{ match.deck.name|default:"Unknown" }}</td>
+                            <td>{{ match.total_turns|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="mt-2">
+                    <a href="{% url 'stats:matches' %}" class="btn btn-sm btn-outline-light">View All Matches</a>
+                </div>
+                {% else %}
+                <p class="text-muted">No matches yet. Import a log file to get started!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deck Win Rates -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">Deck Win Rates</div>
+            <div class="card-body">
+                {% if deck_stats %}
+                <div id="deckWinRateChart"></div>
+                {% else %}
+                <p class="text-muted">No data yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Win Rate Over Time
+    const dailyStats = {{ daily_stats|safe }};
+    if (dailyStats && dailyStats.length > 0) {
+        MTGACharts.winRateTimeChart('#winRateTimeChart', dailyStats);
+    } else {
+        d3.select('#winRateTimeChart').append('p')
+            .attr('class', 'text-muted text-center')
+            .text('No data available for the last 7 days');
+    }
+
+    // Deck Win Rates Bar Chart
+    const deckStats = [
+        {% for deck in deck_stats %}
+        {label: "{{ deck.name|escapejs }}", wins: {{ deck.wins }}, losses: {{ deck.games }} - {{ deck.wins }}, games: {{ deck.games }}},
+        {% endfor %}
+    ];
+    if (deckStats.length > 0) {
+        MTGACharts.winRateBarChart('#deckWinRateChart', deckStats);
+    }
+
+    // Deck Usage Pie Chart
+    const deckUsage = [
+        {% for deck in deck_stats %}
+        {label: "{{ deck.name|escapejs }}", value: {{ deck.games }}},
+        {% endfor %}
+    ];
+    if (deckUsage.length > 0) {
+        MTGACharts.deckUsagePieChart('#deckUsageChart', deckUsage);
+    }
+
+    // Format Win Rates
+    const formatStats = [
+        {% for fmt in format_stats %}
+        {label: "{{ fmt.format|escapejs }}", wins: {{ fmt.wins }}, losses: {{ fmt.games }} - {{ fmt.wins }}, games: {{ fmt.games }}},
+        {% endfor %}
+    ];
+    if (formatStats.length > 0) {
+        MTGACharts.winRateBarChart('#formatWinRateChart', formatStats);
+    }
+});
+</script>
+{% endblock %}

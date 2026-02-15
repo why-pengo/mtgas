@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Matches - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Match History</h1>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Deck</label>
+                <select name="deck" class="form-select">
+                    <option value="">All Decks</option>
+                    {% for deck in decks %}
+                    <option value="{{ deck }}" {% if current_deck == deck %}selected{% endif %}>{{ deck }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Result</label>
+                <select name="result" class="form-select">
+                    <option value="">All Results</option>
+                    <option value="win" {% if current_result == 'win' %}selected{% endif %}>Win</option>
+                    <option value="loss" {% if current_result == 'loss' %}selected{% endif %}>Loss</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Format</label>
+                <select name="format" class="form-select">
+                    <option value="">All Formats</option>
+                    {% for fmt in formats %}
+                    <option value="{{ fmt }}" {% if current_format == fmt %}selected{% endif %}>{{ fmt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">Filter</button>
+                <a href="{% url 'stats:matches' %}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Matches Table -->
+<div class="card">
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Result</th>
+                    <th>Opponent</th>
+                    <th>Deck</th>
+                    <th>Format</th>
+                    <th>Turns</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for match in matches %}
+                <tr>
+                    <td>
+                        <a href="{% url 'stats:match_detail' match.id %}">
+                            {{ match.start_time|date:"M d, Y H:i"|default:"Unknown" }}
+                        </a>
+                    </td>
+                    <td class="{{ match.result }}">
+                        {% if match.result == 'win' %}✓ Win{% elif match.result == 'loss' %}✗ Loss{% else %}? {{ match.result|default:"Incomplete" }}{% endif %}
+                    </td>
+                    <td>{{ match.opponent_name|default:"Unknown" }}</td>
+                    <td>
+                        {% if match.deck %}
+                        <a href="{% url 'stats:deck_detail' match.deck.id %}">{{ match.deck.name }}</a>
+                        {% else %}
+                        Unknown
+                        {% endif %}
+                    </td>
+                    <td>{{ match.event_id|default:"-" }}</td>
+                    <td>{{ match.total_turns|default:"-" }}</td>
+                    <td>{{ match.duration_display|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">No matches found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if page.has_other_pages %}
+        <nav>
+            <ul class="pagination justify-content-center">
+                {% if page.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page.previous_page_number }}{% if current_deck %}&deck={{ current_deck }}{% endif %}{% if current_result %}&result={{ current_result }}{% endif %}{% if current_format %}&format={{ current_format }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+                </li>
+
+                {% if page.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page.next_page_number }}{% if current_deck %}&deck={{ current_deck }}{% endif %}{% if current_result %}&result={{ current_result }}{% endif %}{% if current_format %}&format={{ current_format }}{% endif %}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
