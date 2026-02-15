@@ -10,8 +10,8 @@ cd /Users/jmorgan/workspace/mtgas
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 3. Install dependencies
-pip install -r requirements.txt
+# 3. Install dependencies (editable install with dev tools)
+pip install -e ".[dev]"
 
 # 4. Run database migrations
 python manage.py migrate

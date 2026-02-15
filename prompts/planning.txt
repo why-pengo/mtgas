@@ -26,3 +26,8 @@ Use d3.js to create visualizations for the statistics, such as bar charts for wi
 Write pytests to ensure that the data parsing, database insertion, and querying processes are working correctly.
 Download JSON data from Scryfall instead of using the API to get card details, and store this data in the database to enrich the game statistics with card information.
 Make sure to handle any edge cases, such as incomplete log files or missing data, and implement error handling to ensure the application is robust and can handle unexpected situations gracefully.
+Use the black, flake8 and isort tools to ensure that the code is well-formatted and adheres to best practices for readability and maintainability.
+Create a makefile to automate the setup of the database, running the application, and running tests to streamline the development process and ensure consistency across different environments.
+Finally, document the entire process, including the database schema design, data parsing logic, and how to set up and run the application, so that others can understand and contribute to the project in the
+future.
+Use pyproject.toml instead of a requirements.txt

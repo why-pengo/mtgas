@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtgas"
+version = "0.1.0"
+description = "MTG Arena Statistics Tracker - Track and analyze your Magic: The Gathering Arena games"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "MTG Arena Stats Team"}
+]
+keywords = ["mtg", "magic the gathering", "arena", "statistics", "tracker"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Django :: 4.2",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+]
+
+dependencies = [
+    "Django>=4.2",
+    "requests>=2.28",
+    "python-dateutil>=2.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-django>=4.5",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "flake8>=6.0",
+    "isort>=5.12",
+]
+postgres = [
+    "psycopg2-binary>=2.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/mtgas"
+Documentation = "https://github.com/yourusername/mtgas/docs"
+Repository = "https://github.com/yourusername/mtgas"
+Issues = "https://github.com/yourusername/mtgas/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stats*", "src*", "mtgas_project*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.git
+    | \.venv
+    | venv
+    | __pycache__
+    | migrations
+    | \.eggs
+    | build
+    | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "venv", "migrations", "__pycache__"]
+known_django = ["django"]
+known_first_party = ["stats", "src", "mtgas_project"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "mtgas_project.settings"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "E501", "W503"]
+exclude = [".git", "__pycache__", ".venv", "venv", "migrations", "build", "dist"]
+per-file-ignores = ["__init__.py:F401"]
+
+[tool.coverage.run]
+source = ["stats", "src"]
+omit = ["*/migrations/*", "*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

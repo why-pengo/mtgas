@@ -32,7 +32,11 @@ source .venv/bin/activate  # On macOS/Linux
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+# Install production dependencies
+pip install -e .
+
+# Or install with development tools (recommended)
+pip install -e ".[dev]"
 ```
 
 ### 3. Initialize Database
@@ -125,8 +129,8 @@ pytest --cov=stats --cov=src
 ```
 mtgas/
 ├── manage.py                    # Django management script
-├── requirements.txt             # Python dependencies
-├── pytest.ini                   # Pytest configuration
+├── pyproject.toml               # Project config & dependencies
+├── Makefile                     # Build automation
 ├── mtgas_project/               # Django project settings
 │   ├── settings.py
 │   ├── urls.py
@@ -203,6 +207,55 @@ The dashboard includes interactive D3.js charts:
 - **Mana Curve**: Bar chart showing card distribution by mana cost
 - **Color Distribution**: Horizontal stacked bar for deck colors
 - **Life Total Chart**: Line chart tracking life totals during a match
+
+## Code Quality
+
+The project uses industry-standard tools for code quality:
+
+```bash
+# Format code with black and isort
+make format
+
+# Check formatting without changes
+make format-check
+
+# Run flake8 linter
+make lint
+
+# Run all checks
+make check
+```
+
+## Makefile Commands
+
+The project includes a Makefile for common tasks:
+
+| Command | Description |
+|---------|-------------|
+| `make setup` | Full setup (install deps + migrate) |
+| `make run` | Start development server |
+| `make test` | Run all tests |
+| `make test-cov` | Run tests with coverage |
+| `make format` | Format code with black/isort |
+| `make lint` | Run flake8 linter |
+| `make check` | Run all code quality checks |
+| `make ci` | Run checks + tests (for CI) |
+| `make download-cards` | Download Scryfall data |
+| `make import-log LOG=path` | Import a log file |
+| `make clean` | Remove cache files |
+| `make help` | Show all commands |
+
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- [Database Schema](docs/DATABASE_SCHEMA.md) - Complete schema documentation with ER diagram
+- [Log Parsing](docs/LOG_PARSING.md) - How the MTGA log file is parsed
+- [Development Guide](docs/DEVELOPMENT.md) - Setting up development environment
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this project.
 
 ## License
 
