@@ -6,11 +6,10 @@ Coordinates log parsing, card lookup, and database storage.
 
 import json
 import logging
-from typing import List, Optional, Set
-from datetime import datetime
+from typing import Optional, Set
 
-from ..parser.log_parser import MTGALogParser, MatchData, parse_log_file
 from ..db.database import DatabaseManager, get_db, init_db
+from ..parser.log_parser import MatchData, parse_log_file
 from .scryfall import ScryfallService, get_scryfall
 
 logger = logging.getLogger(__name__)
@@ -21,8 +20,9 @@ class DataImportService:
     Service for importing MTG Arena log data into the database.
     """
 
-    def __init__(self, db: Optional[DatabaseManager] = None,
-                 scryfall: Optional[ScryfallService] = None):
+    def __init__(
+        self, db: Optional[DatabaseManager] = None, scryfall: Optional[ScryfallService] = None
+    ):
         """
         Initialize the import service.
 
@@ -39,7 +39,7 @@ class DataImportService:
         """Load IDs of already imported matches."""
         try:
             cursor = self.db.execute("SELECT match_id FROM matches")
-            self._imported_matches = {row['match_id'] for row in cursor.fetchall()}
+            self._imported_matches = {row["match_id"] for row in cursor.fetchall()}
             logger.info(f"Found {len(self._imported_matches)} existing matches")
         except Exception as e:
             logger.warning(f"Failed to load existing matches: {e}")
@@ -93,23 +93,39 @@ class DataImportService:
             duration = int((match.end_time - match.start_time).total_seconds())
 
         # Insert match record
-        cursor = self.db.execute("""
+        cursor = self.db.execute(
+            """
             INSERT INTO matches (
-                match_id, game_number, 
+                match_id, game_number,
                 player_seat_id, player_name, player_user_id,
                 opponent_seat_id, opponent_name, opponent_user_id,
                 deck_id, event_id, format, match_type,
                 result, winning_team_id, winning_reason,
                 start_time, end_time, duration_seconds, total_turns
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            match.match_id, 1,
-            match.player_seat_id, match.player_name, match.player_user_id,
-            match.opponent_seat_id, match.opponent_name, match.opponent_user_id,
-            deck_db_id, match.event_id, match.format, match.match_type,
-            match.result, match.winning_team_id, match.winning_reason,
-            match.start_time, match.end_time, duration, match.total_turns
-        ))
+        """,
+            (
+                match.match_id,
+                1,
+                match.player_seat_id,
+                match.player_name,
+                match.player_user_id,
+                match.opponent_seat_id,
+                match.opponent_name,
+                match.opponent_user_id,
+                deck_db_id,
+                match.event_id,
+                match.format,
+                match.match_type,
+                match.result,
+                match.winning_team_id,
+                match.winning_reason,
+                match.start_time,
+                match.end_time,
+                duration,
+                match.total_turns,
+            ),
+        )
 
         match_db_id = cursor.lastrowid
 
@@ -130,31 +146,34 @@ class DataImportService:
             return None
 
         # Check if deck already exists
-        cursor = self.db.execute(
-            "SELECT id FROM decks WHERE deck_id = ?",
-            (match.deck_id,)
-        )
+        cursor = self.db.execute("SELECT id FROM decks WHERE deck_id = ?", (match.deck_id,))
         row = cursor.fetchone()
         if row:
-            return row['id']
+            return row["id"]
 
         # Insert new deck
-        cursor = self.db.execute("""
+        cursor = self.db.execute(
+            """
             INSERT INTO decks (deck_id, name, format)
             VALUES (?, ?, ?)
-        """, (match.deck_id, match.deck_name, match.format))
+        """,
+            (match.deck_id, match.deck_name, match.format),
+        )
 
         deck_db_id = cursor.lastrowid
 
         # Insert deck cards
         for card in match.deck_cards:
-            card_id = card.get('cardId')
-            quantity = card.get('quantity', 1)
+            card_id = card.get("cardId")
+            quantity = card.get("quantity", 1)
             if card_id:
-                self.db.execute("""
+                self.db.execute(
+                    """
                     INSERT OR IGNORE INTO deck_cards (deck_id, card_grp_id, quantity, is_sideboard)
                     VALUES (?, ?, ?, ?)
-                """, (deck_db_id, card_id, quantity, False))
+                """,
+                    (deck_db_id, card_id, quantity, False),
+                )
 
         return deck_db_id
 
@@ -164,18 +183,18 @@ class DataImportService:
 
         # From deck
         for card in match.deck_cards:
-            if card.get('cardId'):
-                card_ids.add(card['cardId'])
+            if card.get("cardId"):
+                card_ids.add(card["cardId"])
 
         # From card instances
         for inst_data in match.card_instances.values():
-            if inst_data.get('grp_id'):
-                card_ids.add(inst_data['grp_id'])
+            if inst_data.get("grp_id"):
+                card_ids.add(inst_data["grp_id"])
 
         # From actions
         for action in match.actions:
-            if action.get('card_grp_id'):
-                card_ids.add(action['card_grp_id'])
+            if action.get("card_grp_id"):
+                card_ids.add(action["card_grp_id"])
 
         return card_ids
 
@@ -185,12 +204,11 @@ class DataImportService:
             return
 
         # Check which cards we already have
-        placeholders = ','.join('?' * len(card_ids))
+        placeholders = ",".join("?" * len(card_ids))
         cursor = self.db.execute(
-            f"SELECT grp_id FROM cards WHERE grp_id IN ({placeholders})",
-            tuple(card_ids)
+            f"SELECT grp_id FROM cards WHERE grp_id IN ({placeholders})", tuple(card_ids)
         )
-        existing_ids = {row['grp_id'] for row in cursor.fetchall()}
+        existing_ids = {row["grp_id"] for row in cursor.fetchall()}
 
         # Look up missing cards
         missing_ids = card_ids - existing_ids
@@ -201,92 +219,104 @@ class DataImportService:
                 card_data = self.scryfall.get_card_by_arena_id(grp_id)
 
                 if card_data:
-                    self.db.execute("""
+                    self.db.execute(
+                        """
                         INSERT OR REPLACE INTO cards (
-                            grp_id, name, mana_cost, cmc, type_line, 
+                            grp_id, name, mana_cost, cmc, type_line,
                             colors, color_identity, set_code, rarity,
                             oracle_text, power, toughness, scryfall_id, image_uri
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        grp_id,
-                        card_data.get('name'),
-                        card_data.get('mana_cost'),
-                        card_data.get('cmc'),
-                        card_data.get('type_line'),
-                        json.dumps(card_data.get('colors', [])),
-                        json.dumps(card_data.get('color_identity', [])),
-                        card_data.get('set_code'),
-                        card_data.get('rarity'),
-                        card_data.get('oracle_text'),
-                        card_data.get('power'),
-                        card_data.get('toughness'),
-                        card_data.get('scryfall_id'),
-                        card_data.get('image_uri'),
-                    ))
+                    """,
+                        (
+                            grp_id,
+                            card_data.get("name"),
+                            card_data.get("mana_cost"),
+                            card_data.get("cmc"),
+                            card_data.get("type_line"),
+                            json.dumps(card_data.get("colors", [])),
+                            json.dumps(card_data.get("color_identity", [])),
+                            card_data.get("set_code"),
+                            card_data.get("rarity"),
+                            card_data.get("oracle_text"),
+                            card_data.get("power"),
+                            card_data.get("toughness"),
+                            card_data.get("scryfall_id"),
+                            card_data.get("image_uri"),
+                        ),
+                    )
                 else:
                     # Insert placeholder for unknown cards
-                    self.db.execute("""
+                    self.db.execute(
+                        """
                         INSERT OR IGNORE INTO cards (grp_id, name)
                         VALUES (?, ?)
-                    """, (grp_id, f"Unknown Card ({grp_id})"))
+                    """,
+                        (grp_id, f"Unknown Card ({grp_id})"),
+                    )
 
     def _import_actions(self, match_db_id: int, match: MatchData):
         """Import game actions for a match."""
         # Filter to significant actions only
         significant_types = {
-            'ActionType_Cast', 'ActionType_Play',
-            'ActionType_Attack', 'ActionType_Block',
-            'ActionType_Activate', 'ActionType_Activate_Mana',
-            'ActionType_Resolution'
+            "ActionType_Cast",
+            "ActionType_Play",
+            "ActionType_Attack",
+            "ActionType_Block",
+            "ActionType_Activate",
+            "ActionType_Activate_Mana",
+            "ActionType_Resolution",
         }
 
         # Deduplicate actions by (game_state_id, action_type, instance_id)
         seen = set()
         for action in match.actions:
             key = (
-                action.get('game_state_id'),
-                action.get('action_type'),
-                action.get('instance_id')
+                action.get("game_state_id"),
+                action.get("action_type"),
+                action.get("instance_id"),
             )
 
-            action_type = action.get('action_type', '')
+            action_type = action.get("action_type", "")
             if key in seen or action_type not in significant_types:
                 continue
             seen.add(key)
 
             mana_cost_json = None
-            if action.get('mana_cost'):
-                mana_cost_json = json.dumps(action['mana_cost'])
+            if action.get("mana_cost"):
+                mana_cost_json = json.dumps(action["mana_cost"])
 
-            self.db.execute("""
+            self.db.execute(
+                """
                 INSERT INTO game_actions (
                     match_id, game_state_id, turn_number, phase, step,
                     active_player_seat, seat_id, action_type,
                     instance_id, card_grp_id, ability_grp_id, mana_cost, timestamp_ms
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                match_db_id,
-                action.get('game_state_id'),
-                action.get('turn_number'),
-                action.get('phase'),
-                action.get('step'),
-                action.get('active_player'),
-                action.get('seat_id'),
-                action.get('action_type'),
-                action.get('instance_id'),
-                action.get('card_grp_id'),
-                action.get('ability_grp_id'),
-                mana_cost_json,
-                action.get('timestamp'),
-            ))
+            """,
+                (
+                    match_db_id,
+                    action.get("game_state_id"),
+                    action.get("turn_number"),
+                    action.get("phase"),
+                    action.get("step"),
+                    action.get("active_player"),
+                    action.get("seat_id"),
+                    action.get("action_type"),
+                    action.get("instance_id"),
+                    action.get("card_grp_id"),
+                    action.get("ability_grp_id"),
+                    mana_cost_json,
+                    action.get("timestamp"),
+                ),
+            )
 
     def _import_life_changes(self, match_db_id: int, match: MatchData):
         """Import life total changes for a match."""
         prev_life = {}
 
         for lc in match.life_changes:
-            seat_id = lc.get('seat_id')
-            life_total = lc.get('life_total')
+            seat_id = lc.get("seat_id")
+            life_total = lc.get("life_total")
 
             if seat_id is None or life_total is None:
                 continue
@@ -301,18 +331,21 @@ class DataImportService:
 
             prev_life[seat_id] = life_total
 
-            self.db.execute("""
+            self.db.execute(
+                """
                 INSERT INTO life_changes (
                     match_id, game_state_id, turn_number, seat_id, life_total, change_amount
                 ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                match_db_id,
-                lc.get('game_state_id'),
-                lc.get('turn_number'),
-                seat_id,
-                life_total,
-                change,
-            ))
+            """,
+                (
+                    match_db_id,
+                    lc.get("game_state_id"),
+                    lc.get("turn_number"),
+                    seat_id,
+                    life_total,
+                    change,
+                ),
+            )
 
     def _import_zone_transfers(self, match_db_id: int, match: MatchData):
         """Import zone transfers for a match."""
@@ -320,31 +353,30 @@ class DataImportService:
         seen = set()
 
         for zt in match.zone_transfers:
-            key = (
-                zt.get('game_state_id'),
-                zt.get('instance_id'),
-                zt.get('category')
-            )
+            key = (zt.get("game_state_id"), zt.get("instance_id"), zt.get("category"))
 
             if key in seen:
                 continue
             seen.add(key)
 
-            self.db.execute("""
+            self.db.execute(
+                """
                 INSERT INTO zone_transfers (
                     match_id, game_state_id, turn_number,
                     instance_id, card_grp_id, from_zone, to_zone, category
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                match_db_id,
-                zt.get('game_state_id'),
-                zt.get('turn_number'),
-                zt.get('instance_id'),
-                zt.get('card_grp_id'),
-                zt.get('from_zone'),
-                zt.get('to_zone'),
-                zt.get('category'),
-            ))
+            """,
+                (
+                    match_db_id,
+                    zt.get("game_state_id"),
+                    zt.get("turn_number"),
+                    zt.get("instance_id"),
+                    zt.get("card_grp_id"),
+                    zt.get("from_zone"),
+                    zt.get("to_zone"),
+                    zt.get("category"),
+                ),
+            )
 
 
 def import_log(log_path: str, db_path: Optional[str] = None) -> int:
@@ -361,4 +393,3 @@ def import_log(log_path: str, db_path: Optional[str] = None) -> int:
     db = init_db(db_path)
     service = DataImportService(db)
     return service.import_log_file(log_path)
-

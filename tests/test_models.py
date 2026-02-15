@@ -4,12 +4,14 @@ Tests for Django models and database operations.
 Tests model creation, relationships, and querying.
 """
 
-import pytest
-from datetime import datetime, timedelta
+import sys
+from datetime import timedelta
+from pathlib import Path
+
 from django.utils import timezone
 
-import sys
-from pathlib import Path
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -17,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def sample_card(db):
     """Create a sample card for testing."""
     from stats.models import Card
+
     return Card.objects.create(
         grp_id=12345,
         name="Lightning Bolt",
@@ -26,7 +29,7 @@ def sample_card(db):
         colors=["R"],
         color_identity=["R"],
         set_code="m10",
-        rarity="common"
+        rarity="common",
     )
 
 
@@ -34,16 +37,9 @@ def sample_card(db):
 def sample_deck(db, sample_card):
     """Create a sample deck for testing."""
     from stats.models import Deck, DeckCard
-    deck = Deck.objects.create(
-        deck_id="deck-uuid-123",
-        name="Red Aggro",
-        format="Standard"
-    )
-    DeckCard.objects.create(
-        deck=deck,
-        card=sample_card,
-        quantity=4
-    )
+
+    deck = Deck.objects.create(deck_id="deck-uuid-123", name="Red Aggro", format="Standard")
+    DeckCard.objects.create(deck=deck, card=sample_card, quantity=4)
     return deck
 
 
@@ -51,6 +47,7 @@ def sample_deck(db, sample_card):
 def sample_match(db, sample_deck):
     """Create a sample match for testing."""
     from stats.models import Match
+
     return Match.objects.create(
         match_id="match-uuid-456",
         player_name="TestPlayer",
@@ -65,7 +62,7 @@ def sample_match(db, sample_deck):
         start_time=timezone.now() - timedelta(minutes=15),
         end_time=timezone.now(),
         duration_seconds=900,
-        total_turns=10
+        total_turns=10,
     )
 
 
@@ -76,12 +73,8 @@ class TestCardModel:
     def test_card_creation(self):
         """Test basic card creation."""
         from stats.models import Card
-        card = Card.objects.create(
-            grp_id=11111,
-            name="Test Card",
-            mana_cost="{1}{U}",
-            cmc=2.0
-        )
+
+        card = Card.objects.create(grp_id=11111, name="Test Card", mana_cost="{1}{U}", cmc=2.0)
 
         assert card.grp_id == 11111
         assert card.name == "Test Card"
@@ -90,6 +83,7 @@ class TestCardModel:
     def test_card_str_unknown(self):
         """Test card string representation with no name."""
         from stats.models import Card
+
         card = Card.objects.create(grp_id=99999)
 
         assert "Unknown" in str(card)
@@ -98,11 +92,8 @@ class TestCardModel:
     def test_card_colors_json_field(self):
         """Test that colors field stores JSON correctly."""
         from stats.models import Card
-        card = Card.objects.create(
-            grp_id=22222,
-            name="Multicolor",
-            colors=["W", "U", "B"]
-        )
+
+        card = Card.objects.create(grp_id=22222, name="Multicolor", colors=["W", "U", "B"])
 
         card.refresh_from_db()
         assert card.colors == ["W", "U", "B"]
@@ -116,11 +107,7 @@ class TestDeckModel:
         """Test deck creation with cards."""
         from stats.models import Deck, DeckCard
 
-        deck = Deck.objects.create(
-            deck_id="new-deck-123",
-            name="Control Deck",
-            format="Historic"
-        )
+        deck = Deck.objects.create(deck_id="new-deck-123", name="Control Deck", format="Historic")
 
         DeckCard.objects.create(deck=deck, card=sample_card, quantity=4)
 
@@ -138,16 +125,8 @@ class TestDeckModel:
 
         # Create 3 wins and 1 loss
         for i in range(3):
-            Match.objects.create(
-                match_id=f"win-{i}",
-                deck=sample_deck,
-                result="win"
-            )
-        Match.objects.create(
-            match_id="loss-1",
-            deck=sample_deck,
-            result="loss"
-        )
+            Match.objects.create(match_id=f"win-{i}", deck=sample_deck, result="win")
+        Match.objects.create(match_id="loss-1", deck=sample_deck, result="loss")
 
         assert sample_deck.win_rate() == 75.0
 
@@ -170,6 +149,7 @@ class TestMatchModel:
     def test_match_duration_display_none(self):
         """Test duration display when no duration."""
         from stats.models import Match
+
         match = Match.objects.create(match_id="no-duration")
         assert match.duration_display() is None
 
@@ -182,7 +162,7 @@ class TestMatchModel:
         Match.objects.create(match_id="m2", start_time=now - timedelta(hours=1))
         Match.objects.create(match_id="m3", start_time=now)
 
-        matches = list(Match.objects.values_list('match_id', flat=True))
+        matches = list(Match.objects.values_list("match_id", flat=True))
         assert matches == ["m3", "m2", "m1"]
 
 
@@ -201,7 +181,7 @@ class TestGameActionModel:
             seat_id=2,
             action_type="ActionType_Cast",
             card=sample_card,
-            mana_cost=[{"color": "R", "count": 1}]
+            mana_cost=[{"color": "R", "count": 1}],
         )
 
         assert action.turn_number == 3
@@ -217,18 +197,9 @@ class TestLifeChangeModel:
         """Test life change recording."""
         from stats.models import LifeChange
 
+        LifeChange.objects.create(match=sample_match, turn_number=1, seat_id=2, life_total=20)
         LifeChange.objects.create(
-            match=sample_match,
-            turn_number=1,
-            seat_id=2,
-            life_total=20
-        )
-        LifeChange.objects.create(
-            match=sample_match,
-            turn_number=2,
-            seat_id=2,
-            life_total=17,
-            change_amount=-3
+            match=sample_match, turn_number=2, seat_id=2, life_total=17, change_amount=-3
         )
 
         changes = sample_match.life_changes.all()
@@ -248,7 +219,7 @@ class TestImportSessionModel:
             file_size=1024000,
             status="completed",
             matches_imported=5,
-            matches_skipped=2
+            matches_skipped=2,
         )
 
         assert session.matches_imported == 5
@@ -274,9 +245,7 @@ class TestModelRelationships:
         from stats.models import GameAction
 
         GameAction.objects.create(
-            match=sample_match,
-            action_type="ActionType_Cast",
-            card=sample_card
+            match=sample_match, action_type="ActionType_Cast", card=sample_card
         )
 
         assert GameAction.objects.count() == 1
@@ -306,18 +275,15 @@ class TestQueryingMatches:
 
     def test_aggregate_stats(self, sample_deck):
         """Test aggregating match statistics."""
+        from django.db.models import Avg, Count
+
         from stats.models import Match
-        from django.db.models import Count, Avg
 
         Match.objects.create(match_id="m1", deck=sample_deck, result="win", total_turns=8)
         Match.objects.create(match_id="m2", deck=sample_deck, result="win", total_turns=12)
         Match.objects.create(match_id="m3", deck=sample_deck, result="loss", total_turns=10)
 
-        stats = Match.objects.aggregate(
-            total=Count('id'),
-            avg_turns=Avg('total_turns')
-        )
+        stats = Match.objects.aggregate(total=Count("id"), avg_turns=Avg("total_turns"))
 
-        assert stats['total'] == 3
-        assert stats['avg_turns'] == 10.0
-
+        assert stats["total"] == 3
+        assert stats["avg_turns"] == 10.0

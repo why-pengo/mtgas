@@ -6,7 +6,6 @@ Handles SQLite database initialization and connection management.
 import sqlite3
 from pathlib import Path
 from typing import Optional
-import os
 
 
 class DatabaseManager:
@@ -32,8 +31,7 @@ class DatabaseManager:
         """Get or create a database connection."""
         if self._connection is None:
             self._connection = sqlite3.connect(
-                str(self.db_path),
-                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+                str(self.db_path), detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
             )
             # Enable foreign keys
             self._connection.execute("PRAGMA foreign_keys = ON")
@@ -51,7 +49,7 @@ class DatabaseManager:
         """Initialize the database schema from schema.sql."""
         schema_path = Path(__file__).parent / "schema.sql"
 
-        with open(schema_path, 'r') as f:
+        with open(schema_path, "r") as f:
             schema_sql = f.read()
 
         conn = self.get_connection()
@@ -103,4 +101,3 @@ def init_db(db_path: Optional[str] = None) -> DatabaseManager:
     _db_manager = DatabaseManager(db_path)
     _db_manager.initialize_schema()
     return _db_manager
-

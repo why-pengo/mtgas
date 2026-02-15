@@ -4,16 +4,13 @@ Tests for the Scryfall bulk data service.
 Tests downloading, indexing, and querying card data.
 """
 
-import pytest
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.services.scryfall import ScryfallBulkService
+from src.services.scryfall import ScryfallBulkService  # noqa: E402
 
 
 class TestScryfallServiceInitialization:
@@ -24,7 +21,7 @@ class TestScryfallServiceInitialization:
         cache_dir = tmp_path / "cache"
         assert not cache_dir.exists()
 
-        service = ScryfallBulkService(str(cache_dir))
+        ScryfallBulkService(str(cache_dir))
 
         assert cache_dir.exists()
 
@@ -55,7 +52,7 @@ class TestCardDataSimplification:
             "oracle_text": "Lightning Bolt deals 3 damage to any target.",
             "id": "scryfall-123",
             "arena_id": 67890,
-            "image_uris": {"normal": "https://example.com/bolt.jpg"}
+            "image_uris": {"normal": "https://example.com/bolt.jpg"},
         }
 
         simplified = service._simplify_card_data(card_data)
@@ -82,14 +79,14 @@ class TestCardDataSimplification:
                     "oracle_text": "At the beginning of your upkeep...",
                     "power": "1",
                     "toughness": "1",
-                    "image_uris": {"normal": "https://example.com/delver.jpg"}
+                    "image_uris": {"normal": "https://example.com/delver.jpg"},
                 },
                 {
                     "name": "Insectile Aberration",
                     "type_line": "Creature — Human Insect",
                     "power": "3",
-                    "toughness": "2"
-                }
+                    "toughness": "2",
+                },
             ],
             "cmc": 1,
             "colors": ["U"],
@@ -97,7 +94,7 @@ class TestCardDataSimplification:
             "set": "isd",
             "rarity": "common",
             "id": "scryfall-456",
-            "arena_id": 12345
+            "arena_id": 12345,
         }
 
         simplified = service._simplify_card_data(card_data)
@@ -112,11 +109,7 @@ class TestCardDataSimplification:
         """Test simplifying card with missing optional fields."""
         service = ScryfallBulkService(str(tmp_path))
 
-        card_data = {
-            "name": "Basic Land",
-            "type_line": "Basic Land — Plains",
-            "set": "m21"
-        }
+        card_data = {"name": "Basic Land", "type_line": "Basic Land — Plains", "set": "m21"}
 
         simplified = service._simplify_card_data(card_data)
 
@@ -141,7 +134,7 @@ class TestIndexOperations:
         ]
 
         bulk_file = tmp_path / "scryfall_default_cards.json"
-        with open(bulk_file, 'w') as f:
+        with open(bulk_file, "w") as f:
             json.dump(bulk_data, f)
 
         result = service._build_index()
@@ -190,9 +183,7 @@ class TestCardLookup:
     def test_get_card_by_arena_id(self, tmp_path):
         """Test looking up card by Arena ID."""
         service = ScryfallBulkService(str(tmp_path))
-        service._arena_id_index = {
-            12345: {"name": "Lightning Bolt", "mana_cost": "{R}"}
-        }
+        service._arena_id_index = {12345: {"name": "Lightning Bolt", "mana_cost": "{R}"}}
         service._index_loaded = True
 
         card = service.get_card_by_arena_id(12345)
@@ -246,4 +237,3 @@ class TestServiceStats:
         assert stats["total_cards"] == 100
         assert stats["index_loaded"] is True
         assert stats["bulk_file_exists"] is True
-

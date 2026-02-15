@@ -6,15 +6,11 @@ Downloads and indexes bulk JSON for efficient local lookups.
 """
 
 import json
-import requests
-import time
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Set
 import logging
-import gzip
-import os
+from pathlib import Path
+from typing import Any, Dict, Optional, Set
 
-from ..exceptions import ScryfallError, ScryfallDownloadError, ScryfallIndexError
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +87,9 @@ class ScryfallBulkService:
 
             # Find default_cards data
             download_url = None
-            for item in bulk_info.get('data', []):
-                if item.get('type') == 'default_cards':
-                    download_url = item.get('download_uri')
+            for item in bulk_info.get("data", []):
+                if item.get("type") == "default_cards":
+                    download_url = item.get("download_uri")
                     break
 
             if not download_url:
@@ -107,17 +103,19 @@ class ScryfallBulkService:
             try:
                 with requests.get(download_url, stream=True, timeout=600) as r:
                     r.raise_for_status()
-                    total_size = int(r.headers.get('content-length', 0))
+                    total_size = int(r.headers.get("content-length", 0))
                     downloaded = 0
 
-                    with open(self._bulk_file_path, 'wb') as f:
+                    with open(self._bulk_file_path, "wb") as f:
                         for chunk in r.iter_content(chunk_size=8192 * 16):
                             f.write(chunk)
                             downloaded += len(chunk)
                             if total_size > 0:
                                 pct = downloaded / total_size * 100
                                 if downloaded % (8192 * 1000) == 0:
-                                    logger.info(f"Downloaded {downloaded / 1024 / 1024:.1f}MB ({pct:.1f}%)")
+                                    logger.info(
+                                        f"Downloaded {downloaded / 1024 / 1024:.1f}MB ({pct:.1f}%)"
+                                    )
             except requests.Timeout:
                 logger.error("Download timed out - Scryfall server may be slow")
                 # Clean up partial download
@@ -147,14 +145,14 @@ class ScryfallBulkService:
         try:
             logger.info(f"Building Arena ID index from {self._bulk_file_path}...")
 
-            with open(self._bulk_file_path, 'r', encoding='utf-8') as f:
+            with open(self._bulk_file_path, "r", encoding="utf-8") as f:
                 cards = json.load(f)
 
             self._arena_id_index = {}
             count = 0
 
             for card in cards:
-                arena_id = card.get('arena_id')
+                arena_id = card.get("arena_id")
                 if arena_id:
                     self._arena_id_index[arena_id] = self._simplify_card_data(card)
                     count += 1
@@ -174,7 +172,7 @@ class ScryfallBulkService:
         """Save index to disk for faster future loads."""
         try:
             logger.info("Saving Arena ID index...")
-            with open(self._index_file_path, 'w') as f:
+            with open(self._index_file_path, "w") as f:
                 json.dump(self._arena_id_index, f)
             logger.info(f"Index saved to {self._index_file_path}")
         except Exception as e:
@@ -187,7 +185,7 @@ class ScryfallBulkService:
 
         try:
             logger.info("Loading Arena ID index from cache...")
-            with open(self._index_file_path, 'r') as f:
+            with open(self._index_file_path, "r") as f:
                 data = json.load(f)
 
             # Convert string keys back to int
@@ -203,37 +201,37 @@ class ScryfallBulkService:
     def _simplify_card_data(self, card: Dict) -> Dict[str, Any]:
         """Simplify Scryfall card data to essential fields."""
         # Handle double-faced cards
-        if 'card_faces' in card and len(card['card_faces']) > 0:
-            front_face = card['card_faces'][0]
-            mana_cost = front_face.get('mana_cost', card.get('mana_cost', ''))
-            type_line = front_face.get('type_line', card.get('type_line', ''))
-            oracle_text = front_face.get('oracle_text', card.get('oracle_text', ''))
-            power = front_face.get('power')
-            toughness = front_face.get('toughness')
-            image_uri = front_face.get('image_uris', {}).get('normal')
+        if "card_faces" in card and len(card["card_faces"]) > 0:
+            front_face = card["card_faces"][0]
+            mana_cost = front_face.get("mana_cost", card.get("mana_cost", ""))
+            type_line = front_face.get("type_line", card.get("type_line", ""))
+            oracle_text = front_face.get("oracle_text", card.get("oracle_text", ""))
+            power = front_face.get("power")
+            toughness = front_face.get("toughness")
+            image_uri = front_face.get("image_uris", {}).get("normal")
         else:
-            mana_cost = card.get('mana_cost', '')
-            type_line = card.get('type_line', '')
-            oracle_text = card.get('oracle_text', '')
-            power = card.get('power')
-            toughness = card.get('toughness')
-            image_uri = card.get('image_uris', {}).get('normal')
+            mana_cost = card.get("mana_cost", "")
+            type_line = card.get("type_line", "")
+            oracle_text = card.get("oracle_text", "")
+            power = card.get("power")
+            toughness = card.get("toughness")
+            image_uri = card.get("image_uris", {}).get("normal")
 
         return {
-            'name': card.get('name'),
-            'mana_cost': mana_cost,
-            'cmc': card.get('cmc', 0),
-            'type_line': type_line,
-            'colors': card.get('colors', []),
-            'color_identity': card.get('color_identity', []),
-            'set_code': card.get('set'),
-            'rarity': card.get('rarity'),
-            'oracle_text': oracle_text,
-            'power': power,
-            'toughness': toughness,
-            'scryfall_id': card.get('id'),
-            'arena_id': card.get('arena_id'),
-            'image_uri': image_uri,
+            "name": card.get("name"),
+            "mana_cost": mana_cost,
+            "cmc": card.get("cmc", 0),
+            "type_line": type_line,
+            "colors": card.get("colors", []),
+            "color_identity": card.get("color_identity", []),
+            "set_code": card.get("set"),
+            "rarity": card.get("rarity"),
+            "oracle_text": oracle_text,
+            "power": power,
+            "toughness": toughness,
+            "scryfall_id": card.get("id"),
+            "arena_id": card.get("arena_id"),
+            "image_uri": image_uri,
         }
 
     def get_card_by_arena_id(self, arena_id: int) -> Optional[Dict[str, Any]]:
@@ -278,12 +276,13 @@ class ScryfallBulkService:
             self.ensure_bulk_data()
 
         return {
-            'total_cards': len(self._arena_id_index),
-            'index_loaded': self._index_loaded,
-            'bulk_file_exists': self._bulk_file_path.exists(),
-            'bulk_file_size_mb': (
+            "total_cards": len(self._arena_id_index),
+            "index_loaded": self._index_loaded,
+            "bulk_file_exists": self._bulk_file_path.exists(),
+            "bulk_file_size_mb": (
                 self._bulk_file_path.stat().st_size / 1024 / 1024
-                if self._bulk_file_path.exists() else 0
+                if self._bulk_file_path.exists()
+                else 0
             ),
         }
 

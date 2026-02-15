@@ -7,6 +7,7 @@ Provides specific exception types for different error scenarios.
 
 class MTGAStatsError(Exception):
     """Base exception for all MTGA Stats errors."""
+
     pass
 
 
@@ -28,11 +29,13 @@ class LogParseError(MTGAStatsError):
 
 class InvalidLogFormatError(LogParseError):
     """Log file format is not recognized or invalid."""
+
     pass
 
 
 class IncompleteLogError(LogParseError):
     """Log file appears to be truncated or incomplete."""
+
     pass
 
 
@@ -49,16 +52,19 @@ class CardLookupError(MTGAStatsError):
 
 class ScryfallError(MTGAStatsError):
     """Error interacting with Scryfall data."""
+
     pass
 
 
 class ScryfallDownloadError(ScryfallError):
     """Failed to download Scryfall bulk data."""
+
     pass
 
 
 class ScryfallIndexError(ScryfallError):
     """Failed to build or load Scryfall index."""
+
     pass
 
 
@@ -75,10 +81,11 @@ class ImportError(MTGAStatsError):
 
 class DuplicateMatchError(ImportError):
     """Match has already been imported."""
+
     pass
 
 
 class DatabaseError(MTGAStatsError):
     """Error with database operations."""
-    pass
 
+    pass

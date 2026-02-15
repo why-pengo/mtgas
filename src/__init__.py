@@ -1,2 +1,1 @@
 # MTG Arena Statistics Tracker
-
