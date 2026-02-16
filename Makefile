@@ -134,7 +134,17 @@ lint: ## Run flake8 linter
 	flake8 src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Linting complete$(NC)"
 
-check: format-check lint ## Run all code quality checks (format + lint)
+lint-css: ## Run stylelint on CSS files
+	@echo "$(BLUE)Running stylelint...$(NC)"
+	npx stylelint 'stats/static/css/**/*.css'
+	@echo "$(GREEN)CSS linting complete$(NC)"
+
+lint-css-fix: ## Fix CSS linting issues automatically
+	@echo "$(BLUE)Fixing CSS with stylelint...$(NC)"
+	npx stylelint 'stats/static/css/**/*.css' --fix
+	@echo "$(GREEN)CSS fixed$(NC)"
+
+check: format-check lint lint-css ## Run all code quality checks (format + lint)
 	@echo "$(GREEN)All checks passed$(NC)"
 
 # =============================================================================

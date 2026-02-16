@@ -209,11 +209,44 @@ extend-ignore = E203, E501, W503
 exclude = .git, __pycache__, .venv, migrations
 ```
 
+### CSS Linting with Stylelint
+
+Stylelint checks CSS for errors and enforces consistent style.
+
+```bash
+# Install Node.js dependencies (first time only)
+npm install
+
+# Run CSS linter
+make lint-css
+
+# Auto-fix CSS issues
+make lint-css-fix
+
+# Or manually:
+npx stylelint 'stats/static/css/**/*.css'
+```
+
+Configuration in `.stylelintrc.json`:
+```json
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "color-hex-length": "long",
+    "alpha-value-notation": "number",
+    "color-function-notation": "legacy"
+  }
+}
+```
+
 ### Running All Checks
 
 ```bash
-# Run format check + lint
+# Run format check + Python lint
 make check
+
+# Run format check + Python lint + CSS lint
+make check-all
 
 # Run format check + lint + tests
 make ci

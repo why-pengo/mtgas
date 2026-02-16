@@ -64,6 +64,9 @@ make format
 # Check formatting and linting
 make check
 
+# Run CSS linting (requires: npm install)
+make lint-css
+
 # Run all CI checks (format + lint + tests)
 make ci
 ```
@@ -80,7 +83,9 @@ Run `make help` to see all available commands:
 | `make test-cov` | Run tests with coverage |
 | `make format` | Format code with black/isort |
 | `make lint` | Run flake8 linter |
-| `make check` | Run all code quality checks |
+| `make lint-css` | Run stylelint on CSS |
+| `make check` | Run Python code quality checks |
+| `make check-all` | Run all checks including CSS |
 | `make ci` | Run checks + tests (for CI) |
 | `make download-cards` | Download Scryfall data |
 | `make import-log LOG=path` | Import a log file |

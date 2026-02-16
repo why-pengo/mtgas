@@ -7,7 +7,8 @@ Tracks imports using match_id to avoid duplicates.
 
 import os
 import sys
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from pathlib import Path
 from typing import Set
 

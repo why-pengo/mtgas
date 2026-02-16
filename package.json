@@ -1,0 +1,15 @@
+{
+  "name": "mtgas-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend tooling for MTG Arena Statistics Tracker",
+  "scripts": {
+    "lint:css": "stylelint 'stats/static/css/**/*.css'",
+    "lint:css:fix": "stylelint 'stats/static/css/**/*.css' --fix"
+  },
+  "devDependencies": {
+    "stylelint": "^16.2.0",
+    "stylelint-config-standard": "^36.0.0"
+  }
+}
+
