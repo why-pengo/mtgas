@@ -141,7 +141,9 @@ class Command(BaseCommand):
         if match_data.start_time and match_data.end_time:
             duration = int((match_data.end_time - match_data.start_time).total_seconds())
 
-        # Make datetimes timezone-aware
+        # Defensive check: ensure datetimes are timezone-aware
+        # Note: Parser now creates timezone-aware datetimes, but we keep this
+        # as a safety net in case of legacy data or future changes
         start_time = match_data.start_time
         end_time = match_data.end_time
         if start_time and start_time.tzinfo is None:

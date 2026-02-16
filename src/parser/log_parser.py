@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
@@ -144,7 +144,7 @@ class MTGALogParser:
                     try:
                         self._last_timestamp = datetime.strptime(
                             ts_match.group(1), "%m/%d/%Y %I:%M:%S %p"
-                        )
+                        ).replace(tzinfo=timezone.utc)
                     except ValueError:
                         pass
 
@@ -284,7 +284,9 @@ class MTGALogParser:
             # Start new match
             self.current_match = MatchData(match_id=match_id)
             if event.timestamp:
-                self.current_match.start_time = datetime.fromtimestamp(event.timestamp / 1000)
+                self.current_match.start_time = datetime.fromtimestamp(
+                    event.timestamp / 1000, tz=timezone.utc
+                )
             elif self._last_timestamp:
                 self.current_match.start_time = self._last_timestamp
 
@@ -315,7 +317,9 @@ class MTGALogParser:
         # Check for match completion
         if state_type == "MatchGameRoomStateType_MatchCompleted":
             if event.timestamp:
-                self.current_match.end_time = datetime.fromtimestamp(event.timestamp / 1000)
+                self.current_match.end_time = datetime.fromtimestamp(
+                    event.timestamp / 1000, tz=timezone.utc
+                )
 
             # Extract result from finalMatchResult if available
             final_result = game_room_info.get("finalMatchResult", {})
