@@ -6,42 +6,88 @@
 # 1. Navigate to project directory
 cd /Users/jmorgan/workspace/mtgas
 
-# 2. Create and activate virtual environment (if not already done)
-python3 -m venv .venv
+# 2. Create and activate virtual environment
+make venv
 source .venv/bin/activate
 
-# 3. Install dependencies (editable install with dev tools)
+# 3. Full setup (install deps + migrate database)
+make setup
+
+# 4. Download Scryfall card data (one-time, ~350MB)
+make download-cards
+
+# 5. Import your game log (batch import after sessions)
+make import-log LOG=data/Player.log
+
+# 6. Start the web server
+make run
+
+# 7. Open browser to http://127.0.0.1:8000/
+```
+
+## Alternative: Manual Setup
+
+If you prefer not to use the Makefile:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
-
-# 4. Run database migrations
 python manage.py migrate
-
-# 5. Download Scryfall card data (one-time, ~350MB)
 python manage.py download_cards
-
-# 6. Import your game log (batch import after sessions)
 python manage.py import_log data/Player.log
-
-# 7. Start the web server
 python manage.py runserver
-
-# 8. Open browser to http://127.0.0.1:8000/
 ```
 
 ## Running Tests
 
 ```bash
 # Run all tests
-pytest
+make test
 
 # Run with verbose output
-pytest -v
+make test-verbose
+
+# Run with coverage report
+make test-cov
 
 # Run specific test file
 pytest tests/test_parser.py
 ```
 
-## Key Features Implemented
+## Code Quality
+
+```bash
+# Format code with black and isort
+make format
+
+# Check formatting and linting
+make check
+
+# Run all CI checks (format + lint + tests)
+make ci
+```
+
+## Makefile Commands Reference
+
+Run `make help` to see all available commands:
+
+| Command | Description |
+|---------|-------------|
+| `make setup` | Full setup (install deps + migrate) |
+| `make run` | Start development server |
+| `make test` | Run all tests |
+| `make test-cov` | Run tests with coverage |
+| `make format` | Format code with black/isort |
+| `make lint` | Run flake8 linter |
+| `make check` | Run all code quality checks |
+| `make ci` | Run checks + tests (for CI) |
+| `make download-cards` | Download Scryfall data |
+| `make import-log LOG=path` | Import a log file |
+| `make clean` | Remove cache files |
+| `make help` | Show all commands |
+
+## Key Features
 
 ### Database (Django ORM with SQLite)
 - **Match tracking** by `match_id` (unique identifier from Arena)
@@ -52,12 +98,12 @@ pytest tests/test_parser.py
 - **Import sessions** tracking
 
 ### Batch Import
-- Run `python manage.py import_log` after gaming sessions
+- Run `make import-log LOG=/path/to/Player.log` after gaming sessions
 - Uses `match_id` to track and avoid duplicate imports
 - Supports `--force` flag to re-import all matches
 
 ### Scryfall Integration
-- Downloads bulk JSON (~350MB) once with `download_cards` command
+- Downloads bulk JSON (~350MB) once with `make download-cards`
 - Builds local index for fast Arena ID → card name lookups
 - No per-card API calls needed
 
@@ -76,21 +122,10 @@ pytest tests/test_parser.py
 - Color distribution stacked bar
 - Life total timeline
 
-### Testing (pytest)
-- Parser unit tests
-- Scryfall service tests
-- Django model tests
-- View integration tests
-
-### Error Handling
-- Custom exceptions for specific error types
-- Graceful handling of malformed JSON
-- Continues parsing after non-fatal errors
-- Validates log file format
-
 ## File Locations
 
 - **Log File** (macOS): `~/Library/Logs/Wizards Of The Coast/MTGA/Player.log`
+- **Log File** (Windows): `%APPDATA%\..\LocalLow\Wizards Of The Coast\MTGA\Player.log`
 - **Database**: `data/mtga_stats.db`
 - **Card Cache**: `data/cache/arena_id_index.json`
 

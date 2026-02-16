@@ -7,7 +7,7 @@ Tracks imports using match_id to avoid duplicates.
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Set
 
@@ -57,7 +57,7 @@ class Command(BaseCommand):
         # Get file info
         file_stat = os.stat(log_path)
         file_size = file_stat.st_size
-        file_modified = datetime.fromtimestamp(file_stat.st_mtime, tz=timezone.utc)
+        file_modified = datetime.fromtimestamp(file_stat.st_mtime, tz=dt_timezone.utc)
 
         # Create import session
         session = ImportSession.objects.create(
@@ -140,6 +140,14 @@ class Command(BaseCommand):
         if match_data.start_time and match_data.end_time:
             duration = int((match_data.end_time - match_data.start_time).total_seconds())
 
+        # Make datetimes timezone-aware
+        start_time = match_data.start_time
+        end_time = match_data.end_time
+        if start_time and start_time.tzinfo is None:
+            start_time = timezone.make_aware(start_time)
+        if end_time and end_time.tzinfo is None:
+            end_time = timezone.make_aware(end_time)
+
         # Create match - use match_id as the tracking key
         match = Match.objects.create(
             match_id=match_data.match_id,
@@ -157,8 +165,8 @@ class Command(BaseCommand):
             result=match_data.result,
             winning_team_id=match_data.winning_team_id,
             winning_reason=match_data.winning_reason,
-            start_time=match_data.start_time,
-            end_time=match_data.end_time,
+            start_time=start_time,
+            end_time=end_time,
             duration_seconds=duration,
             total_turns=match_data.total_turns,
         )
