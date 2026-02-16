@@ -180,6 +180,17 @@ a:hover {
     color: #ff6b81;
 }
 
+/* Card links to Scryfall */
+a.card-link {
+    color: #64b5f6;
+    text-decoration: none;
+}
+
+a.card-link:hover {
+    color: #90caf9;
+    text-decoration: underline;
+}
+
 /* =============================================================================
    Breadcrumbs
    ============================================================================= */

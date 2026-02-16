@@ -83,7 +83,12 @@
                 <h6 class="mt-3">{{ category }} ({{ cards|length }})</h6>
                 {% for item in cards %}
                 <div class="small">
-                    {{ item.quantity }}x {{ item.card.name|default:"Unknown" }}
+                    {{ item.quantity }}x
+                    {% if item.card.name %}
+                    <a href="https://scryfall.com/search?q=!%22{{ item.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ item.card.name }}</a>
+                    {% else %}
+                    Unknown
+                    {% endif %}
                     <span class="text-muted">{{ item.card.mana_cost }}</span>
                 </div>
                 {% endfor %}

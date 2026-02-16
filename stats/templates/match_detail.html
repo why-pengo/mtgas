@@ -73,7 +73,13 @@
             <div class="card-body scrollable-deck-list">
                 <small>
                 {% for dc in deck_cards %}
-                <div>{{ dc.quantity }}x {{ dc.card.name|default:"Unknown" }}</div>
+                <div>{{ dc.quantity }}x
+                    {% if dc.card.name %}
+                    <a href="https://scryfall.com/search?q=!%22{{ dc.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ dc.card.name }}</a>
+                    {% else %}
+                    Unknown
+                    {% endif %}
+                </div>
                 {% endfor %}
                 </small>
             </div>
@@ -106,7 +112,7 @@
                         </span>
                         - {{ action.action_type|slice:"11:" }}
                         {% if action.card %}
-                        <strong>{{ action.card.name }}</strong>
+                        <strong><a href="https://scryfall.com/search?q=!%22{{ action.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ action.card.name }}</a></strong>
                         {% endif %}
                         <span class="text-muted">({{ action.phase|slice:"6:"|default:"" }})</span>
                     </div>

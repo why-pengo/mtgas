@@ -97,6 +97,10 @@ What CSS linting could be implemented?
 
 --bs-secondary-color is overriding --text-primary
 
+## Scryfall Card Links
+
+Make all mtg card names be links to that card on scryfall.com.
+
 ---
 
 ## Summary of What Was Built
@@ -107,6 +111,7 @@ What CSS linting could be implemented?
 3. **Scryfall Integration** - Downloads bulk card data for card name resolution
 4. **Database Schema** - SQLite database with 8 tables for comprehensive tracking
 5. **D3.js Visualizations** - Interactive charts for win rates, deck usage, mana curves
+6. **Scryfall Card Links** - All card names link to Scryfall for card details
 
 ### Database Tables
 - `cards` - Card metadata from Scryfall
@@ -152,4 +157,5 @@ What CSS linting could be implemented?
 - Only dynamic `width` values remain inline (required for template variables)
 - Added Bootstrap CSS variable overrides for dark theme compatibility
 - Implemented stylelint for CSS linting with `stylelint-config-standard`
+- Added `.card-link` class for Scryfall links (blue color, distinct from accent)
 
