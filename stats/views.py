@@ -310,6 +310,94 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     )
 
 
+def deck_gallery(request: HttpRequest, deck_id: int) -> HttpResponse:
+    """Card gallery view with Scryfall images."""
+    deck = get_object_or_404(Deck, pk=deck_id)
+    scryfall = get_scryfall()
+
+    # Handle image download request
+    if request.method == "POST" and request.POST.get("action") == "download_images":
+        deck_cards = deck.deck_cards.select_related("card").all()
+        downloaded = 0
+        failed = 0
+
+        for dc in deck_cards:
+            result = scryfall.download_card_image(dc.card.grp_id)
+            if result:
+                downloaded += 1
+            else:
+                failed += 1
+
+        if downloaded > 0:
+            messages.success(request, f"Downloaded {downloaded} card images.")
+        if failed > 0:
+            messages.warning(request, f"Failed to download {failed} images.")
+
+        return redirect("stats:deck_gallery", deck_id=deck_id)
+
+    # Get deck cards grouped by category
+    deck_cards = deck.deck_cards.select_related("card").order_by("card__cmc", "card__name")
+
+    cards_by_type = {}
+    images_cached = 0
+    total_cards = 0
+
+    for dc in deck_cards:
+        card = dc.card
+        type_line = card.type_line or "Unknown"
+        total_cards += dc.quantity
+
+        # Categorize by type
+        if "Creature" in type_line:
+            category = "Creatures"
+        elif "Land" in type_line:
+            category = "Lands"
+        elif "Instant" in type_line or "Sorcery" in type_line:
+            category = "Spells"
+        elif "Artifact" in type_line:
+            category = "Artifacts"
+        elif "Enchantment" in type_line:
+            category = "Enchantments"
+        elif "Planeswalker" in type_line:
+            category = "Planeswalkers"
+        else:
+            category = "Other"
+
+        # Check if image is cached
+        image_cached = scryfall.get_cached_image_path(card.grp_id) is not None
+        if image_cached:
+            images_cached += 1
+
+        if category not in cards_by_type:
+            cards_by_type[category] = []
+
+        cards_by_type[category].append(
+            {
+                "quantity": dc.quantity,
+                "card": card,
+                "image_cached": image_cached,
+                "image_url": card.image_uri,
+            }
+        )
+
+    # Calculate cache status
+    unique_cards = len(deck_cards)
+    cache_percentage = round(images_cached / unique_cards * 100) if unique_cards > 0 else 0
+
+    return render(
+        request,
+        "deck_gallery.html",
+        {
+            "deck": deck,
+            "cards_by_type": cards_by_type,
+            "images_cached": images_cached,
+            "unique_cards": unique_cards,
+            "total_cards": total_cards,
+            "cache_percentage": cache_percentage,
+        },
+    )
+
+
 def import_log(request: HttpRequest) -> HttpResponse:
     """Import log file via web UI."""
     if request.method == "POST":

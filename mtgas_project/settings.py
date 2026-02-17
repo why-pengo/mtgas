@@ -80,7 +80,10 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
-STATICFILES_DIRS = [BASE_DIR / "stats" / "static"]
+STATICFILES_DIRS = [
+    BASE_DIR / "stats" / "static",
+    BASE_DIR / "data" / "cache",  # Serve cached card images
+]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

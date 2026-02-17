@@ -87,11 +87,12 @@ make ci          # Run check + test (use before commits)
 - Import checks `Match.objects.filter(match_id=...).exists()` before creating
 - Use `--force` flag to re-import existing matches
 
-### Card Resolution
-- Arena logs use `grpId` (integer IDs)
-- Scryfall bulk data (~350MB JSON) downloaded once via `download_cards` command
-- Cached in `data/cache/arena_id_index.json` for fast lookups
-- `Card` model stores Scryfall data (name, mana_cost, cmc, colors, etc.)
+### Scryfall Integration
+- Uses Scryfall's bulk data to map Arena's `grpId` to card names
+- **Image caching**: `download_card_image()` and `get_cached_image_path()` methods
+  - Downloads card images from Scryfall on demand
+  - Caches locally in `data/cache/card_images/{grp_id}.jpg`
+  - Batch download available in deck gallery view
 
 ### Database Schema Key Relationships
 ```
@@ -184,6 +185,11 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
+- **Card image caching**: Deck gallery view downloads and caches Scryfall card images locally
+  - Images stored in `data/cache/card_images/`
+  - One-click batch download for all cards in a deck
+  - Progress indicator shows cache status
+  - Images served via Django static files
 - **Card data management**: Web UI at `/card-data/` shows download status and triggers Scryfall bulk data download
   - Displays index status, card count, file size, last download date
   - One-click download (or force re-download) with progress feedback

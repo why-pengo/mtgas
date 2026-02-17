@@ -16,6 +16,7 @@
                     <th>Wins</th>
                     <th>Win Rate</th>
                     <th>Last Played</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -40,10 +41,15 @@
                         {% endif %}
                     </td>
                     <td>{{ deck.last_played|date:"M d, Y"|default:"-" }}</td>
+                    <td>
+                        <a href="{% url 'stats:deck_gallery' deck.id %}" class="btn btn-sm btn-outline-primary" title="View Card Gallery">
+                            <i class="bi bi-images"></i> Gallery
+                        </a>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted">No decks found</td>
+                    <td colspan="7" class="text-center text-muted">No decks found</td>
                 </tr>
                 {% endfor %}
             </tbody>

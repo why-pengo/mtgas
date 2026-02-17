@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}{{ deck.name }} - Card Gallery{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    .card-item {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #f8f9fa;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    .card-image-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 139.5%; /* Magic card aspect ratio */
+        background: #e9ecef;
+    }
+    .card-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .card-placeholder {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        padding: 10px;
+        font-size: 12px;
+        color: #6c757d;
+    }
+    .card-quantity {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        z-index: 10;
+    }
+    .category-section {
+        margin-bottom: 40px;
+    }
+    .category-title {
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    .cache-status {
+        margin-bottom: 20px;
+    }
+    .progress {
+        height: 25px;
+        font-size: 14px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'stats:decks' %}">Decks</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'stats:deck_detail' deck.id %}">{{ deck.name }}</a></li>
+        <li class="breadcrumb-item active">Card Gallery</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>{{ deck.name }} - Card Gallery</h1>
+    <div>
+        <a href="{% url 'stats:deck_detail' deck.id %}" class="btn btn-secondary">
+            Back to Deck Stats
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Cache Status -->
+<div class="card cache-status">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h5>Image Cache Status</h5>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" 
+                         style="width: {{ cache_percentage }}%"
+                         aria-valuenow="{{ cache_percentage }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        {{ images_cached }} / {{ unique_cards }} cached ({{ cache_percentage }}%)
+                    </div>
+                </div>
+                <small class="text-muted mt-2 d-block">
+                    {{ unique_cards }} unique cards • {{ total_cards }} total cards in deck
+                </small>
+            </div>
+            <div class="col-md-4 text-end">
+                {% if cache_percentage < 100 %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="download_images">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-download"></i> Download Missing Images
+                    </button>
+                </form>
+                <small class="text-muted d-block mt-2">
+                    This may take a few minutes
+                </small>
+                {% else %}
+                <div class="alert alert-success mb-0">
+                    <strong>✓ All images cached!</strong>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card Gallery by Category -->
+{% for category, cards in cards_by_type.items %}
+<div class="category-section">
+    <h2 class="category-title">
+        {{ category }}
+        <span class="badge bg-secondary">{{ cards|length }}</span>
+    </h2>
+    
+    <div class="card-gallery">
+        {% for item in cards %}
+        <div class="card-item">
+            {% if item.quantity > 1 %}
+            <div class="card-quantity">{{ item.quantity }}</div>
+            {% endif %}
+            
+            <div class="card-image-container">
+                {% if item.image_cached %}
+                    <img src="/static/card_images/{{ item.card.grp_id }}.jpg" 
+                         alt="{{ item.card.name }}"
+                         class="card-image"
+                         loading="lazy">
+                {% elif item.image_url %}
+                    <img src="{{ item.image_url }}" 
+                         alt="{{ item.card.name }}"
+                         class="card-image"
+                         loading="lazy">
+                {% else %}
+                    <div class="card-placeholder">
+                        <strong>{{ item.card.name }}</strong><br>
+                        <small>No image available</small>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="p-2 text-center bg-black">
+                <small><strong>{{ item.card.name }}</strong></small><br>
+                <small class="text-muted">
+                    {% if item.card.mana_cost %}{{ item.card.mana_cost }}{% endif %}
+                </small>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% empty %}
+<div class="alert alert-info">
+    No cards in this deck yet.
+</div>
+{% endfor %}
+
+{% endblock %}

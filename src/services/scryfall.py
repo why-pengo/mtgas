@@ -286,6 +286,62 @@ class ScryfallBulkService:
             ),
         }
 
+    def download_card_image(self, card_grp_id: int) -> Optional[Path]:
+        """
+        Download and cache a card image from Scryfall.
+
+        Args:
+            card_grp_id: Arena card group ID
+
+        Returns:
+            Path to cached image file, or None if download failed
+        """
+        card_data = self.get_card_by_arena_id(card_grp_id)
+        if not card_data or not card_data.get("image_uri"):
+            logger.warning(f"No image URI found for card {card_grp_id}")
+            return None
+
+        # Create images cache directory
+        images_dir = self.cache_dir / "card_images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        # Use grp_id as filename
+        image_path = images_dir / f"{card_grp_id}.jpg"
+
+        # Return cached image if exists
+        if image_path.exists():
+            return image_path
+
+        # Download image
+        try:
+            image_uri = card_data["image_uri"]
+            response = requests.get(image_uri, timeout=10)
+            response.raise_for_status()
+
+            # Save to cache
+            with open(image_path, "wb") as f:
+                f.write(response.content)
+
+            logger.info(f"Downloaded image for card {card_grp_id}: {card_data.get('name')}")
+            return image_path
+
+        except Exception as e:
+            logger.error(f"Failed to download image for card {card_grp_id}: {e}")
+            return None
+
+    def get_cached_image_path(self, card_grp_id: int) -> Optional[Path]:
+        """
+        Get path to cached image if it exists.
+
+        Args:
+            card_grp_id: Arena card group ID
+
+        Returns:
+            Path to cached image, or None if not cached
+        """
+        image_path = self.cache_dir / "card_images" / f"{card_grp_id}.jpg"
+        return image_path if image_path.exists() else None
+
 
 # Singleton instance
 _scryfall_service: Optional[ScryfallBulkService] = None
