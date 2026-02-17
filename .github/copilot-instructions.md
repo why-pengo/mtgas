@@ -18,7 +18,8 @@ make download-cards     # Download Scryfall bulk data (one-time, ~350MB)
 ```bash
 make run                # Start Django dev server on http://127.0.0.1:8000
 python manage.py shell  # Django shell
-make import-log LOG=/path/to/Player.log  # Import MTGA log file
+make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
+# Or use web UI: http://127.0.0.1:8000/import/
 ```
 
 ### Testing
@@ -161,6 +162,7 @@ LifeChange, ZoneTransfer
 2. Extend `BaseCommand`, implement `add_arguments()` and `handle()`
 3. Use `self.stdout.write(self.style.SUCCESS('...'))` for output
 4. Add to Makefile if used frequently
+5. Consider if functionality should also be exposed via web UI (see `import_log` view for example)
 
 ## Development Workflow
 
@@ -176,6 +178,9 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
+- **Web-based imports**: Log imports available via web UI at `/import/` (uses temporary file upload)
+  - Handles file uploads, shows progress messages, redirects to import history
+  - Helper functions in `views.py` mirror CLI command logic
 - **Timezone handling**: Timestamps stored in UTC, displayed in `America/New_York` (Eastern Time)
   - Change `TIME_ZONE` in `settings.py` for different local timezone
   - Parser stores all timestamps with `timezone.utc`

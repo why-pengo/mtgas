@@ -63,7 +63,16 @@ python manage.py createsuperuser
 
 ### Import Game Data
 
-After your gaming sessions, import your Player.log file:
+After your gaming sessions, import your Player.log file.
+
+**Option 1: Web Interface (Easiest)**
+
+1. Start the web server: `python manage.py runserver`
+2. Navigate to http://127.0.0.1:8000/import/
+3. Upload your Player.log file
+4. View import results at http://127.0.0.1:8000/imports/
+
+**Option 2: Command Line**
 
 ```bash
 python manage.py import_log /path/to/Player.log

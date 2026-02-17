@@ -11,4 +11,5 @@ exclude =
     dist
 per-file-ignores =
     __init__.py:F401
+    stats/views.py:E402
 

@@ -2,16 +2,28 @@
 Django views for MTG Arena Statistics.
 """
 
-from datetime import timedelta
+import os
+import sys
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
+from pathlib import Path
 
+from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Avg, Count, Max, Q
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .models import Deck, ImportSession, Match
+# Add src to path for parser imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.parser.log_parser import MatchData, MTGALogParser
+from src.services.scryfall import get_scryfall
+
+from .models import Card, Deck, DeckCard, GameAction, ImportSession, LifeChange, Match, ZoneTransfer
 
 
 def dashboard(request):
@@ -277,6 +289,109 @@ def deck_detail(request, deck_id):
     )
 
 
+def import_log(request):
+    """Import log file via web UI."""
+    if request.method == "POST":
+        # Check if file was uploaded
+        log_file = request.FILES.get("log_file")
+        force = request.POST.get("force") == "on"
+
+        if not log_file:
+            messages.error(request, "No log file uploaded.")
+            return redirect("stats:import_log")
+
+        # Save uploaded file temporarily
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".log") as tmp_file:
+            for chunk in log_file.chunks():
+                tmp_file.write(chunk)
+            tmp_path = tmp_file.name
+
+        try:
+            # Get file info
+            file_size = os.path.getsize(tmp_path)
+            file_modified = datetime.fromtimestamp(os.path.getmtime(tmp_path), tz=dt_timezone.utc)
+
+            # Create import session
+            session = ImportSession.objects.create(
+                log_file=log_file.name,
+                file_size=file_size,
+                file_modified=file_modified,
+                status="running",
+            )
+
+            # Ensure card data is available
+            scryfall = get_scryfall()
+            scryfall.ensure_bulk_data()
+
+            # Get existing match IDs to skip
+            existing_match_ids = set()
+            if not force:
+                existing_match_ids = set(Match.objects.values_list("match_id", flat=True))
+
+            # Parse log file
+            parser = MTGALogParser(tmp_path)
+            matches = parser.parse_matches()
+
+            # Import matches
+            imported_count = 0
+            skipped_count = 0
+            errors = []
+
+            for match_data in matches:
+                if not force and match_data.match_id in existing_match_ids:
+                    skipped_count += 1
+                    continue
+
+                try:
+                    _import_match(match_data, scryfall)
+                    imported_count += 1
+                except Exception as e:
+                    errors.append(f"Match {match_data.match_id[:8]}: {str(e)}")
+                    if len(errors) <= 5:  # Only store first 5 errors
+                        continue
+
+            # Update session
+            session.matches_imported = imported_count
+            session.matches_skipped = skipped_count
+            session.status = "completed" if not errors else "completed_with_errors"
+            session.completed_at = timezone.now()
+            if errors:
+                session.error_message = "; ".join(errors[:5])
+            session.save()
+
+            # Show success message
+            if imported_count > 0:
+                messages.success(
+                    request,
+                    f"Successfully imported {imported_count} matches (skipped {skipped_count}).",
+                )
+            else:
+                messages.warning(
+                    request, f"No new matches found. Skipped {skipped_count} existing matches."
+                )
+
+            if errors:
+                messages.warning(request, f"Encountered {len(errors)} errors during import.")
+
+        except Exception as e:
+            if "session" in locals():
+                session.status = "failed"
+                session.error_message = str(e)
+                session.save()
+            messages.error(request, f"Import failed: {str(e)}")
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+        return redirect("stats:import_sessions")
+
+    # GET request - show upload form
+    return render(request, "import_log.html")
+
+
 def import_sessions(request):
     """View import session history."""
     sessions = ImportSession.objects.order_by("-started_at")[:20]
@@ -307,3 +422,255 @@ def api_stats(request):
         )
 
     return JsonResponse({"daily": daily_data})
+
+
+# Helper functions for importing matches
+@transaction.atomic
+def _import_match(match_data: MatchData, scryfall):
+    """Import a single match into the database."""
+    # Ensure deck exists
+    deck = None
+    if match_data.deck_id:
+        deck = _ensure_deck(match_data, scryfall)
+
+    # Collect all unique card IDs and ensure they're in the cards table
+    card_grp_ids = _collect_card_ids(match_data)
+    _ensure_cards(card_grp_ids, scryfall)
+
+    # Calculate duration
+    duration = None
+    if match_data.start_time and match_data.end_time:
+        duration = int((match_data.end_time - match_data.start_time).total_seconds())
+
+    # Ensure datetimes are timezone-aware
+    start_time = match_data.start_time
+    end_time = match_data.end_time
+    if start_time and start_time.tzinfo is None:
+        start_time = timezone.make_aware(start_time)
+    if end_time and end_time.tzinfo is None:
+        end_time = timezone.make_aware(end_time)
+
+    # Create match
+    match = Match.objects.create(
+        match_id=match_data.match_id,
+        game_number=1,
+        player_seat_id=match_data.player_seat_id,
+        player_name=match_data.player_name,
+        player_user_id=match_data.player_user_id,
+        opponent_seat_id=match_data.opponent_seat_id,
+        opponent_name=match_data.opponent_name,
+        opponent_user_id=match_data.opponent_user_id,
+        deck=deck,
+        event_id=match_data.event_id,
+        format=match_data.format,
+        match_type=match_data.match_type,
+        result=match_data.result,
+        winning_team_id=match_data.winning_team_id,
+        winning_reason=match_data.winning_reason,
+        start_time=start_time,
+        end_time=end_time,
+        duration_seconds=duration,
+        total_turns=match_data.total_turns,
+    )
+
+    # Import actions, life changes, zone transfers
+    _import_actions(match, match_data)
+    _import_life_changes(match, match_data)
+    _import_zone_transfers(match, match_data)
+
+    return match
+
+
+def _ensure_deck(match_data: MatchData, scryfall) -> Deck:
+    """Ensure deck exists in database."""
+    deck, created = Deck.objects.get_or_create(
+        deck_id=match_data.deck_id,
+        defaults={
+            "name": match_data.deck_name or "Unknown Deck",
+            "format": match_data.format,
+        },
+    )
+
+    if created and match_data.deck_cards:
+        # Ensure cards exist first
+        card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
+        _ensure_cards(card_ids, scryfall)
+
+        # Add deck cards
+        for card_data in match_data.deck_cards:
+            card_id = card_data.get("cardId")
+            quantity = card_data.get("quantity", 1)
+            if card_id:
+                try:
+                    card = Card.objects.get(grp_id=card_id)
+                    DeckCard.objects.create(
+                        deck=deck, card=card, quantity=quantity, is_sideboard=False
+                    )
+                except Card.DoesNotExist:
+                    pass
+
+    return deck
+
+
+def _collect_card_ids(match_data: MatchData):
+    """Collect all unique card IDs from match data."""
+    card_ids = set()
+
+    for card in match_data.deck_cards:
+        if card.get("cardId"):
+            card_ids.add(card["cardId"])
+
+    for inst_data in match_data.card_instances.values():
+        if inst_data.get("grp_id"):
+            card_ids.add(inst_data["grp_id"])
+
+    for action in match_data.actions:
+        if action.get("card_grp_id"):
+            card_ids.add(action["card_grp_id"])
+
+    return card_ids
+
+
+def _ensure_cards(card_ids, scryfall):
+    """Ensure cards exist in database from Scryfall bulk data."""
+    if not card_ids:
+        return
+
+    existing_ids = set(Card.objects.filter(grp_id__in=card_ids).values_list("grp_id", flat=True))
+    missing_ids = card_ids - existing_ids
+
+    if missing_ids:
+        card_lookup = scryfall.lookup_cards_batch(missing_ids)
+
+        cards_to_create = []
+        for grp_id, card_data in card_lookup.items():
+            if card_data:
+                cards_to_create.append(
+                    Card(
+                        grp_id=grp_id,
+                        name=card_data.get("name"),
+                        mana_cost=card_data.get("mana_cost"),
+                        cmc=card_data.get("cmc"),
+                        type_line=card_data.get("type_line"),
+                        colors=card_data.get("colors", []),
+                        color_identity=card_data.get("color_identity", []),
+                        set_code=card_data.get("set_code"),
+                        rarity=card_data.get("rarity"),
+                        oracle_text=card_data.get("oracle_text"),
+                        power=card_data.get("power"),
+                        toughness=card_data.get("toughness"),
+                        scryfall_id=card_data.get("scryfall_id"),
+                        image_uri=card_data.get("image_uri"),
+                    )
+                )
+            else:
+                cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
+
+        Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
+
+
+def _import_actions(match: Match, match_data: MatchData):
+    """Import game actions for a match."""
+    significant_types = {
+        "ActionType_Cast",
+        "ActionType_Play",
+        "ActionType_Attack",
+        "ActionType_Block",
+        "ActionType_Activate",
+        "ActionType_Activate_Mana",
+        "ActionType_Resolution",
+    }
+
+    seen = set()
+    actions_to_create = []
+
+    for action in match_data.actions:
+        key = (
+            action.get("game_state_id"),
+            action.get("action_type"),
+            action.get("instance_id"),
+        )
+
+        action_type = action.get("action_type", "")
+        if key in seen or action_type not in significant_types:
+            continue
+        seen.add(key)
+
+        card_grp_id = action.get("card_grp_id")
+
+        actions_to_create.append(
+            GameAction(
+                match=match,
+                game_state_id=action.get("game_state_id"),
+                turn_number=action.get("turn_number"),
+                phase=action.get("phase"),
+                step=action.get("step"),
+                active_player_seat=action.get("active_player"),
+                seat_id=action.get("seat_id"),
+                action_type=action_type,
+                instance_id=action.get("instance_id"),
+                card_id=card_grp_id,
+                ability_grp_id=action.get("ability_grp_id"),
+                mana_cost=action.get("mana_cost"),
+                timestamp_ms=action.get("timestamp"),
+            )
+        )
+
+    GameAction.objects.bulk_create(actions_to_create)
+
+
+def _import_life_changes(match: Match, match_data: MatchData):
+    """Import life total changes for a match."""
+    prev_life = {}
+    changes_to_create = []
+
+    for lc in match_data.life_changes:
+        seat_id = lc.get("seat_id")
+        life_total = lc.get("life_total")
+
+        if seat_id is None or life_total is None:
+            continue
+
+        change = None
+        if seat_id in prev_life:
+            change = life_total - prev_life[seat_id]
+            if change == 0:
+                continue
+
+        prev_life[seat_id] = life_total
+
+        changes_to_create.append(
+            LifeChange(
+                match=match,
+                game_state_id=lc.get("game_state_id"),
+                turn_number=lc.get("turn_number"),
+                seat_id=seat_id,
+                life_total=life_total,
+                change=change,
+            )
+        )
+
+    LifeChange.objects.bulk_create(changes_to_create)
+
+
+def _import_zone_transfers(match: Match, match_data: MatchData):
+    """Import zone transfers (card movements) for a match."""
+    transfers_to_create = []
+
+    for zt in match_data.zone_transfers:
+        card_grp_id = zt.get("card_grp_id")
+
+        transfers_to_create.append(
+            ZoneTransfer(
+                match=match,
+                game_state_id=zt.get("game_state_id"),
+                turn_number=zt.get("turn_number"),
+                instance_id=zt.get("instance_id"),
+                card_id=card_grp_id,
+                from_zone=zt.get("from_zone"),
+                to_zone=zt.get("to_zone"),
+                seat_id=zt.get("seat_id"),
+            )
+        )
+
+    ZoneTransfer.objects.bulk_create(transfers_to_create)
