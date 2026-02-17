@@ -47,6 +47,12 @@ python manage.py migrate
 
 ### 4. Download Card Data (One-time)
 
+**Option 1: Web Interface**
+1. Start server: `python manage.py runserver`
+2. Navigate to http://127.0.0.1:8000/card-data/
+3. Click "Download Card Data"
+
+**Option 2: Command Line**
 ```bash
 python manage.py download_cards
 ```

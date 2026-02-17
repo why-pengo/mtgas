@@ -51,6 +51,16 @@ def dashboard(request):
         "avg_duration": round(avg_stats["avg_duration"] or 0, 0),
     }
 
+    # Check card data status
+    scryfall = get_scryfall()
+    try:
+        card_stats = scryfall.stats()
+        card_data_ready = card_stats["index_loaded"] and card_stats["total_cards"] > 0
+        card_count = card_stats["total_cards"]
+    except Exception:
+        card_data_ready = False
+        card_count = 0
+
     # Recent matches
     recent_matches = Match.objects.select_related("deck").order_by("-start_time")[:5]
 
@@ -109,6 +119,8 @@ def dashboard(request):
             "deck_stats": deck_stats,
             "format_stats": format_stats,
             "daily_stats": daily_stats_list,
+            "card_data_ready": card_data_ready,
+            "card_count": card_count,
         },
     )
 
@@ -390,6 +402,87 @@ def import_log(request):
 
     # GET request - show upload form
     return render(request, "import_log.html")
+
+
+def card_data(request):
+    """Card data management page."""
+    from datetime import datetime
+
+    scryfall = get_scryfall()
+
+    # Get current stats
+    try:
+        stats = scryfall.stats()
+        index_loaded = stats["index_loaded"]
+        bulk_file_exists = stats["bulk_file_exists"]
+        total_cards = stats["total_cards"]
+        bulk_file_size_mb = stats["bulk_file_size_mb"]
+
+        # Get file modification date
+        bulk_file_date = None
+        if scryfall._bulk_file_path.exists():
+            bulk_file_date = datetime.fromtimestamp(scryfall._bulk_file_path.stat().st_mtime)
+
+        # Get index file date
+        index_file_date = None
+        if scryfall._index_file_path.exists():
+            index_file_date = datetime.fromtimestamp(scryfall._index_file_path.stat().st_mtime)
+
+    except Exception as e:
+        messages.error(request, f"Error reading card data stats: {str(e)}")
+        index_loaded = False
+        bulk_file_exists = False
+        total_cards = 0
+        bulk_file_size_mb = 0
+        bulk_file_date = None
+        index_file_date = None
+
+    # Get database card count
+    db_card_count = Card.objects.count()
+
+    # Handle download request
+    if request.method == "POST":
+        action = request.POST.get("action")
+        force = request.POST.get("force") == "on"
+
+        if action == "download":
+            try:
+                messages.info(
+                    request, "Downloading Scryfall card data... This may take a few minutes."
+                )
+
+                # Download in the request
+                success = scryfall.ensure_bulk_data(force_download=force)
+
+                if success:
+                    stats = scryfall.stats()
+                    messages.success(
+                        request,
+                        f"Successfully downloaded card data! "
+                        f"{stats['total_cards']} cards indexed "
+                        f"({stats['bulk_file_size_mb']:.1f} MB)",
+                    )
+                else:
+                    messages.error(request, "Failed to download card data. Check logs for details.")
+
+            except Exception as e:
+                messages.error(request, f"Download failed: {str(e)}")
+
+            return redirect("stats:card_data")
+
+    return render(
+        request,
+        "card_data.html",
+        {
+            "index_loaded": index_loaded,
+            "bulk_file_exists": bulk_file_exists,
+            "total_cards": total_cards,
+            "bulk_file_size_mb": bulk_file_size_mb,
+            "bulk_file_date": bulk_file_date,
+            "index_file_date": index_file_date,
+            "db_card_count": db_card_count,
+        },
+    )
 
 
 def import_sessions(request):

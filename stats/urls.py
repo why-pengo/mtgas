@@ -16,5 +16,6 @@ urlpatterns = [
     path("deck/<int:deck_id>/", views.deck_detail, name="deck_detail"),
     path("import/", views.import_log, name="import_log"),
     path("imports/", views.import_sessions, name="import_sessions"),
+    path("card-data/", views.card_data, name="card_data"),
     path("api/stats/", views.api_stats, name="api_stats"),
 ]

@@ -5,6 +5,16 @@
 {% block content %}
 <h1 class="mb-4">Dashboard</h1>
 
+<!-- Card Data Status Alert -->
+{% if not card_data_ready %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <strong>⚠ Card Data Not Downloaded</strong><br>
+    Download Scryfall card data to enable match imports. 
+    <a href="{% url 'stats:card_data' %}" class="alert-link">Go to Card Database Management</a>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- Overall Stats -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -27,8 +37,16 @@
     </div>
     <div class="col-md-3">
         <div class="card stat-card">
-            <div class="stat-value">{{ overall_stats.avg_turns|floatformat:1 }}</div>
-            <div class="stat-label">Avg Turns/Game</div>
+            <div class="stat-value">
+                {% if card_data_ready %}
+                    <span class="text-success">{{ card_count|default:"0" }}</span>
+                {% else %}
+                    <span class="text-warning">Not Ready</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">
+                <a href="{% url 'stats:card_data' %}" class="text-decoration-none text-muted">Card Database</a>
+            </div>
         </div>
     </div>
 </div>

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Card Database - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <h1 class="mb-4">Card Database Management</h1>
+
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Status Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Card Database Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Scryfall Bulk Data</h6>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        {% if bulk_file_exists %}
+                                            <span class="badge bg-success">Downloaded</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Not Downloaded</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Index Status:</strong></td>
+                                    <td>
+                                        {% if index_loaded %}
+                                            <span class="badge bg-success">Loaded</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Not Loaded</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Cards in Index:</strong></td>
+                                    <td>{{ total_cards|default:"0" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>File Size:</strong></td>
+                                    <td>
+                                        {% if bulk_file_size_mb > 0 %}
+                                            {{ bulk_file_size_mb|floatformat:1 }} MB
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Last Downloaded:</strong></td>
+                                    <td>
+                                        {% if bulk_file_date %}
+                                            {{ bulk_file_date|date:"M d, Y H:i" }}
+                                        {% else %}
+                                            Never
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Index Updated:</strong></td>
+                                    <td>
+                                        {% if index_file_date %}
+                                            {{ index_file_date|date:"M d, Y H:i" }}
+                                        {% else %}
+                                            Never
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Local Database</h6>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Cards in Database:</strong></td>
+                                    <td>{{ db_card_count }}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2">
+                                        <small class="text-muted">
+                                            Cards are added to the database automatically when importing matches.
+                                        </small>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        {% if bulk_file_exists and total_cards > 0 %}
+                        <div class="alert alert-success mt-3">
+                            <strong>✓ Ready to import matches!</strong><br>
+                            Card data is downloaded and indexed.
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning mt-3">
+                            <strong>⚠ Card data needed</strong><br>
+                            Download card data before importing matches.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Download Card Data</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="download">
+
+                    <div class="mb-3">
+                        <p>
+                            Download the latest Scryfall bulk card data (~350MB). 
+                            This is required for importing matches and resolving card names.
+                        </p>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input 
+                                type="checkbox" 
+                                class="form-check-input" 
+                                id="force" 
+                                name="force"
+                            >
+                            <label class="form-check-label" for="force">
+                                Force re-download (download even if data already exists)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {% if bulk_file_exists %}
+                        <button type="submit" class="btn btn-primary">
+                            Update Card Data
+                        </button>
+                        {% else %}
+                        <button type="submit" class="btn btn-success btn-lg">
+                            Download Card Data (First Time Setup)
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+
+                <div class="alert alert-info mt-4 mb-0">
+                    <strong>Note:</strong> Download may take 2-5 minutes depending on your connection speed.
+                    The page will reload when complete.
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">About Card Data</h5>
+            </div>
+            <div class="card-body">
+                <h6>What is this?</h6>
+                <p>
+                    MTG Arena logs reference cards by numeric IDs (grpId). To display card names,
+                    we use <a href="https://scryfall.com/" target="_blank">Scryfall's</a> bulk card data,
+                    which maps these IDs to card information.
+                </p>
+
+                <h6>How often should I update?</h6>
+                <p>
+                    Update when new Magic sets are released to ensure new cards are recognized.
+                    Otherwise, updating every few months is sufficient.
+                </p>
+
+                <h6>What happens if I don't download?</h6>
+                <p>
+                    Without card data, imports will fail or cards will show as "Unknown (grpId)".
+                    First-time setup requires downloading this data.
+                </p>
+
+                <h6>Command Line Alternative</h6>
+                <p class="mb-0">
+                    You can also download via command line:<br>
+                    <code>python manage.py download_cards</code> or <code>make download-cards</code>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -20,7 +20,8 @@
         <p>Alternatively, run this command after your gaming session:</p>
         <pre class="bg-dark p-3 rounded"><code>python manage.py import_log /path/to/Player.log</code></pre>
         <p class="mb-0 text-muted">
-            <strong>First time?</strong> Download card data first:
+            <strong>First time?</strong> Download card data first at 
+            <a href="{% url 'stats:card_data' %}">Card Database Management</a> or run:
             <code>python manage.py download_cards</code>
         </p>
     </div>

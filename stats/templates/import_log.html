@@ -86,8 +86,9 @@
         </div>
 
         <div class="alert alert-info mt-4">
-            <strong>Note:</strong> If you haven't downloaded card data yet, import may fail. 
-            Run <code>python manage.py download_cards</code> from the command line first (one-time setup).
+            <strong>First time setup?</strong> Download Scryfall card data first at 
+            <a href="{% url 'stats:card_data' %}" class="alert-link">Card Database Management</a> 
+            or run <code>python manage.py download_cards</code> from the command line.
         </div>
     </div>
 </div>

@@ -20,6 +20,7 @@ make run                # Start Django dev server on http://127.0.0.1:8000
 python manage.py shell  # Django shell
 make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
 # Or use web UI: http://127.0.0.1:8000/import/
+# Card data management: http://127.0.0.1:8000/card-data/
 ```
 
 ### Testing
@@ -178,6 +179,10 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
+- **Card data management**: Web UI at `/card-data/` shows download status and triggers Scryfall bulk data download
+  - Displays index status, card count, file size, last download date
+  - One-click download (or force re-download) with progress feedback
+  - Shows local database card count vs. Scryfall index
 - **Web-based imports**: Log imports available via web UI at `/import/` (uses temporary file upload)
   - Handles file uploads, shows progress messages, redirects to import history
   - Helper functions in `views.py` mirror CLI command logic
