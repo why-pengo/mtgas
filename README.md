@@ -2,6 +2,8 @@
 
 A Django-based application to track your Magic: The Gathering Arena game statistics.
 
+**Requirements**: Python 3.10+, Django 6.0+
+
 ## Features
 
 - **Match Tracking**: Records all match details including opponent, result, deck used, duration, and format

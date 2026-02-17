@@ -2,6 +2,8 @@
 Django models for MTG Arena Statistics Tracker.
 """
 
+from __future__ import annotations
+
 from django.db import models
 
 
@@ -28,7 +30,7 @@ class Card(models.Model):
         db_table = "cards"
         verbose_name_plural = "Cards"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name or f"Unknown ({self.grp_id})"
 
 
@@ -45,13 +47,13 @@ class Deck(models.Model):
     class Meta:
         db_table = "decks"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def total_cards(self):
+    def total_cards(self) -> int:
         return sum(dc.quantity for dc in self.deck_cards.filter(is_sideboard=False))
 
-    def win_rate(self):
+    def win_rate(self) -> float:
         games = self.matches.filter(result__isnull=False).count()
         wins = self.matches.filter(result="win").count()
         return round(wins / games * 100, 1) if games > 0 else 0
@@ -69,7 +71,7 @@ class DeckCard(models.Model):
         db_table = "deck_cards"
         unique_together = ("deck", "card", "is_sideboard")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.quantity}x {self.card.name}"
 
 
@@ -137,11 +139,11 @@ class Match(models.Model):
             models.Index(fields=["opponent_name"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         result_str = self.result or "incomplete"
         return f"{self.match_id[:8]}... vs {self.opponent_name} ({result_str})"
 
-    def duration_display(self):
+    def duration_display(self) -> str | None:
         if not self.duration_seconds:
             return None
         mins = self.duration_seconds // 60
@@ -186,6 +188,10 @@ class GameAction(models.Model):
             models.Index(fields=["match", "turn_number"]),
         ]
 
+    def __str__(self) -> str:
+        card_name = self.card.name if self.card else "Unknown"
+        return f"{self.action_type}: {card_name}"
+
 
 class LifeChange(models.Model):
     """Stores life total changes during the game."""
@@ -201,6 +207,9 @@ class LifeChange(models.Model):
     class Meta:
         db_table = "life_changes"
         ordering = ["game_state_id", "id"]
+
+    def __str__(self) -> str:
+        return f"Seat {self.seat_id}: {self.life_total} life"
 
 
 class ZoneTransfer(models.Model):
@@ -220,6 +229,10 @@ class ZoneTransfer(models.Model):
     class Meta:
         db_table = "zone_transfers"
         ordering = ["game_state_id", "id"]
+
+    def __str__(self) -> str:
+        card_name = self.card.name if self.card else "Unknown"
+        return f"{card_name}: {self.from_zone} → {self.to_zone}"
 
 
 class ImportSession(models.Model):
@@ -248,5 +261,5 @@ class ImportSession(models.Model):
         db_table = "import_sessions"
         ordering = ["-started_at"]
 
-    def __str__(self):
-        return f"Import {self.started_at}: {self.matches_imported} matches"
+    def __str__(self) -> str:
+        return f"Import {self.started_at.strftime('%Y-%m-%d %H:%M')} - {self.status}"

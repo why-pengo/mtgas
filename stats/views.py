@@ -13,20 +13,29 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Avg, Count, Max, Q
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-# Add src to path for parser imports
+# Add src to path for parser imports  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.parser.log_parser import MatchData, MTGALogParser
-from src.services.scryfall import get_scryfall
+from src.parser.log_parser import MatchData, MTGALogParser  # noqa: E402
+from src.services.scryfall import ScryfallBulkService, get_scryfall  # noqa: E402
 
-from .models import Card, Deck, DeckCard, GameAction, ImportSession, LifeChange, Match, ZoneTransfer
+from .models import (  # noqa: E402
+    Card,
+    Deck,
+    DeckCard,
+    GameAction,
+    ImportSession,
+    LifeChange,
+    Match,
+    ZoneTransfer,
+)
 
 
-def dashboard(request):
+def dashboard(request: HttpRequest) -> HttpResponse:
     """Main dashboard with overview statistics."""
     # Overall stats
     matches_with_results = Match.objects.filter(result__isnull=False)
@@ -125,7 +134,7 @@ def dashboard(request):
     )
 
 
-def matches_list(request):
+def matches_list(request: HttpRequest) -> HttpResponse:
     """Match history page."""
     # Filter parameters
     deck_filter = request.GET.get("deck")
@@ -168,7 +177,7 @@ def matches_list(request):
     )
 
 
-def match_detail(request, match_id):
+def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
     """Detailed match view with game replay."""
     match = get_object_or_404(Match.objects.select_related("deck"), pk=match_id)
 
@@ -201,7 +210,7 @@ def match_detail(request, match_id):
     )
 
 
-def decks_list(request):
+def decks_list(request: HttpRequest) -> HttpResponse:
     """Deck performance overview."""
     decks = Deck.objects.annotate(
         games=Count("matches", filter=Q(matches__result__isnull=False)),
@@ -216,7 +225,7 @@ def decks_list(request):
     return render(request, "decks.html", {"decks": decks})
 
 
-def deck_detail(request, deck_id):
+def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     """Detailed deck view."""
     deck = get_object_or_404(Deck, pk=deck_id)
 
@@ -301,7 +310,7 @@ def deck_detail(request, deck_id):
     )
 
 
-def import_log(request):
+def import_log(request: HttpRequest) -> HttpResponse:
     """Import log file via web UI."""
     if request.method == "POST":
         # Check if file was uploaded
@@ -404,7 +413,7 @@ def import_log(request):
     return render(request, "import_log.html")
 
 
-def card_data(request):
+def card_data(request: HttpRequest) -> HttpResponse:
     """Card data management page."""
     from datetime import datetime
 
@@ -485,13 +494,13 @@ def card_data(request):
     )
 
 
-def import_sessions(request):
+def import_sessions(request: HttpRequest) -> HttpResponse:
     """View import session history."""
     sessions = ImportSession.objects.order_by("-started_at")[:20]
     return render(request, "import_sessions.html", {"sessions": sessions})
 
 
-def api_stats(request):
+def api_stats(request: HttpRequest) -> JsonResponse:
     """API endpoint for dashboard charts."""
     thirty_days_ago = timezone.now() - timedelta(days=30)
 
@@ -519,7 +528,7 @@ def api_stats(request):
 
 # Helper functions for importing matches
 @transaction.atomic
-def _import_match(match_data: MatchData, scryfall):
+def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match:
     """Import a single match into the database."""
     # Ensure deck exists
     deck = None
@@ -574,7 +583,7 @@ def _import_match(match_data: MatchData, scryfall):
     return match
 
 
-def _ensure_deck(match_data: MatchData, scryfall) -> Deck:
+def _ensure_deck(match_data: MatchData, scryfall: ScryfallBulkService) -> Deck:
     """Ensure deck exists in database."""
     deck, created = Deck.objects.get_or_create(
         deck_id=match_data.deck_id,
@@ -605,7 +614,7 @@ def _ensure_deck(match_data: MatchData, scryfall) -> Deck:
     return deck
 
 
-def _collect_card_ids(match_data: MatchData):
+def _collect_card_ids(match_data: MatchData) -> set[int]:
     """Collect all unique card IDs from match data."""
     card_ids = set()
 
@@ -624,7 +633,7 @@ def _collect_card_ids(match_data: MatchData):
     return card_ids
 
 
-def _ensure_cards(card_ids, scryfall):
+def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
     """Ensure cards exist in database from Scryfall bulk data."""
     if not card_ids:
         return
@@ -662,7 +671,7 @@ def _ensure_cards(card_ids, scryfall):
         Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
 
 
-def _import_actions(match: Match, match_data: MatchData):
+def _import_actions(match: Match, match_data: MatchData) -> None:
     """Import game actions for a match."""
     significant_types = {
         "ActionType_Cast",
@@ -712,7 +721,7 @@ def _import_actions(match: Match, match_data: MatchData):
     GameAction.objects.bulk_create(actions_to_create)
 
 
-def _import_life_changes(match: Match, match_data: MatchData):
+def _import_life_changes(match: Match, match_data: MatchData) -> None:
     """Import life total changes for a match."""
     prev_life = {}
     changes_to_create = []
@@ -746,7 +755,7 @@ def _import_life_changes(match: Match, match_data: MatchData):
     LifeChange.objects.bulk_create(changes_to_create)
 
 
-def _import_zone_transfers(match: Match, match_data: MatchData):
+def _import_zone_transfers(match: Match, match_data: MatchData) -> None:
     """Import zone transfers (card movements) for a match."""
     transfers_to_create = []
 

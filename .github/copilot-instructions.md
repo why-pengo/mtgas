@@ -4,7 +4,7 @@
 
 Django web application for tracking and analyzing Magic: The Gathering Arena game statistics. Parses MTGA's Player.log file to extract match data, stores it in SQLite/PostgreSQL, and provides a dashboard with D3.js visualizations.
 
-**Tech Stack**: Django 4.2+, Python 3.10+, SQLite (default), D3.js, vanilla CSS/JS
+**Tech Stack**: Django 6.0+, Python 3.10+, SQLite (default), D3.js, vanilla CSS/JS
 
 ## Build & Test Commands
 
@@ -113,11 +113,16 @@ LifeChange, ZoneTransfer
 - **Line length**: 100 characters (black and flake8 configured)
 - **Import order**: `isort` with profile="black", custom sections for Django
   - Order: FUTURE → STDLIB → DJANGO → THIRDPARTY → FIRSTPARTY → LOCALFOLDER
-- **Type hints**: Use where helpful (parser and services use them extensively)
+- **Type hints**: Used throughout codebase (Django 6.0+ compatible)
+  - Views: `HttpRequest`, `HttpResponse`, `JsonResponse` return types
+  - Models: Method return types (`str`, `int`, `float`, `str | None`)
+  - Services: Full typing with `Optional`, `Dict`, `List`, `Set`, `Any`
+  - Use `from __future__ import annotations` in models for forward references
 - **Docstrings**: Required for modules, classes; optional for obvious methods
 - **Django naming**: Models use singular (Match, Deck), tables use plural (`db_table = "matches"`)
 
 ### Django Patterns
+- **Version**: Django 6.0+ - use latest features freely (no backward compatibility needed)
 - **Migrations**: Never edit existing migrations; create new ones with `make makemigrations`
 - **Model queries**: Prefer `select_related()` and `prefetch_related()` to avoid N+1
 - **Admin**: All models registered in `stats/admin.py` with list_display and search_fields
