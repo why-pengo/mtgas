@@ -2,6 +2,7 @@
 Django views for MTG Arena Statistics.
 """
 
+import logging
 import os
 import sys
 from datetime import datetime, timedelta
@@ -16,6 +17,8 @@ from django.db.models.functions import TruncDate
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 # Add src to path for parser imports  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -422,6 +425,8 @@ def import_log(request: HttpRequest) -> HttpResponse:
             file_size = os.path.getsize(tmp_path)
             file_modified = datetime.fromtimestamp(os.path.getmtime(tmp_path), tz=dt_timezone.utc)
 
+            logger.info(f"Starting import from uploaded file: {log_file.name} ({file_size} bytes)")
+
             # Create import session
             session = ImportSession.objects.create(
                 log_file=log_file.name,
@@ -429,17 +434,21 @@ def import_log(request: HttpRequest) -> HttpResponse:
                 file_modified=file_modified,
                 status="running",
             )
+            logger.info(f"Created import session: {session.id}")
 
             # Ensure card data is available
             scryfall = get_scryfall()
             scryfall.ensure_bulk_data()
+            logger.info("Card data ready")
 
             # Get existing match IDs to skip
             existing_match_ids = set()
             if not force:
                 existing_match_ids = set(Match.objects.values_list("match_id", flat=True))
+                logger.info(f"Found {len(existing_match_ids)} existing matches in database")
 
             # Parse log file
+            logger.info("Parsing log file...")
             parser = MTGALogParser(tmp_path)
             matches = parser.parse_matches()
 
@@ -449,17 +458,28 @@ def import_log(request: HttpRequest) -> HttpResponse:
             errors = []
 
             for match_data in matches:
-                if not force and match_data.match_id in existing_match_ids:
+                match_id = match_data.match_id
+
+                if not force and match_id in existing_match_ids:
+                    logger.debug(f"Skipping existing match: {match_id}")
                     skipped_count += 1
                     continue
 
                 try:
+                    logger.info(f"Importing match: {match_id}")
                     _import_match(match_data, scryfall)
                     imported_count += 1
+                    logger.debug(f"Successfully imported match: {match_id}")
                 except Exception as e:
-                    errors.append(f"Match {match_data.match_id[:8]}: {str(e)}")
+                    error_msg = f"Match {match_id[:8]}: {str(e)}"
+                    logger.error(f"Failed to import match {match_id}: {e}", exc_info=True)
+                    errors.append(error_msg)
                     if len(errors) <= 5:  # Only store first 5 errors
                         continue
+
+            logger.info(
+                f"Import complete: {imported_count} imported, {skipped_count} skipped, {len(errors)} errors"
+            )
 
             # Update session
             session.matches_imported = imported_count
@@ -483,6 +503,8 @@ def import_log(request: HttpRequest) -> HttpResponse:
 
             if errors:
                 messages.warning(request, f"Encountered {len(errors)} errors during import.")
+                for error in errors[:3]:  # Show first 3 errors
+                    messages.error(request, error)
 
         except Exception as e:
             if "session" in locals():
@@ -618,13 +640,20 @@ def api_stats(request: HttpRequest) -> JsonResponse:
 @transaction.atomic
 def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match:
     """Import a single match into the database."""
+    match_id = match_data.match_id
+    logger.debug(f"[{match_id}] Starting import")
+
     # Ensure deck exists
     deck = None
     if match_data.deck_id:
+        logger.debug(f"[{match_id}] Processing deck: {match_data.deck_id}")
         deck = _ensure_deck(match_data, scryfall)
+        logger.debug(f"[{match_id}] Deck ready: {deck.name}")
 
     # Collect all unique card IDs and ensure they're in the cards table
+    logger.debug(f"[{match_id}] Collecting card IDs")
     card_grp_ids = _collect_card_ids(match_data)
+    logger.debug(f"[{match_id}] Found {len(card_grp_ids)} unique cards")
     _ensure_cards(card_grp_ids, scryfall)
 
     # Calculate duration
@@ -640,6 +669,7 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
     if end_time and end_time.tzinfo is None:
         end_time = timezone.make_aware(end_time)
 
+    logger.debug(f"[{match_id}] Creating match record")
     # Create match
     match = Match.objects.create(
         match_id=match_data.match_id,
@@ -662,17 +692,27 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
         duration_seconds=duration,
         total_turns=match_data.total_turns,
     )
+    logger.debug(f"[{match_id}] Match created with ID: {match.id}")
 
     # Import actions, life changes, zone transfers
+    logger.debug(f"[{match_id}] Importing game actions")
     _import_actions(match, match_data)
+
+    logger.debug(f"[{match_id}] Importing life changes")
     _import_life_changes(match, match_data)
+
+    logger.debug(f"[{match_id}] Importing zone transfers")
     _import_zone_transfers(match, match_data)
 
+    logger.info(f"[{match_id}] Import complete")
     return match
 
 
 def _ensure_deck(match_data: MatchData, scryfall: ScryfallBulkService) -> Deck:
     """Ensure deck exists in database."""
+    deck_id = match_data.deck_id
+    logger.debug(f"Looking up deck: {deck_id}")
+
     deck, created = Deck.objects.get_or_create(
         deck_id=match_data.deck_id,
         defaults={
@@ -681,23 +721,33 @@ def _ensure_deck(match_data: MatchData, scryfall: ScryfallBulkService) -> Deck:
         },
     )
 
-    if created and match_data.deck_cards:
-        # Ensure cards exist first
-        card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
-        _ensure_cards(card_ids, scryfall)
+    if created:
+        logger.info(f"Created new deck: {deck.name} ({deck_id})")
 
-        # Add deck cards
-        for card_data in match_data.deck_cards:
-            card_id = card_data.get("cardId")
-            quantity = card_data.get("quantity", 1)
-            if card_id:
-                try:
-                    card = Card.objects.get(grp_id=card_id)
-                    DeckCard.objects.create(
-                        deck=deck, card=card, quantity=quantity, is_sideboard=False
-                    )
-                except Card.DoesNotExist:
-                    pass
+        if match_data.deck_cards:
+            logger.debug(f"Adding {len(match_data.deck_cards)} cards to deck")
+            # Ensure cards exist first
+            card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
+            _ensure_cards(card_ids, scryfall)
+
+            # Add deck cards
+            cards_added = 0
+            for card_data in match_data.deck_cards:
+                card_id = card_data.get("cardId")
+                quantity = card_data.get("quantity", 1)
+                if card_id:
+                    try:
+                        card = Card.objects.get(grp_id=card_id)
+                        DeckCard.objects.create(
+                            deck=deck, card=card, quantity=quantity, is_sideboard=False
+                        )
+                        cards_added += 1
+                    except Card.DoesNotExist:
+                        logger.warning(f"Card {card_id} not found in database")
+                        pass
+            logger.debug(f"Added {cards_added} cards to deck {deck.name}")
+    else:
+        logger.debug(f"Using existing deck: {deck.name}")
 
     return deck
 
@@ -730,6 +780,7 @@ def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
     missing_ids = card_ids - existing_ids
 
     if missing_ids:
+        logger.debug(f"Looking up {len(missing_ids)} missing cards from Scryfall")
         card_lookup = scryfall.lookup_cards_batch(missing_ids)
 
         cards_to_create = []
@@ -754,9 +805,14 @@ def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
                     )
                 )
             else:
+                logger.warning(f"Card {grp_id} not found in Scryfall data")
                 cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
 
-        Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
+        if cards_to_create:
+            Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
+            logger.debug(f"Created {len(cards_to_create)} new card records")
+    else:
+        logger.debug(f"All {len(card_ids)} cards already exist in database")
 
 
 def _import_actions(match: Match, match_data: MatchData) -> None:
@@ -806,7 +862,9 @@ def _import_actions(match: Match, match_data: MatchData) -> None:
             )
         )
 
-    GameAction.objects.bulk_create(actions_to_create)
+    if actions_to_create:
+        GameAction.objects.bulk_create(actions_to_create)
+        logger.debug(f"Created {len(actions_to_create)} game actions")
 
 
 def _import_life_changes(match: Match, match_data: MatchData) -> None:
@@ -819,6 +877,9 @@ def _import_life_changes(match: Match, match_data: MatchData) -> None:
         life_total = lc.get("life_total")
 
         if seat_id is None or life_total is None:
+            logger.debug(
+                f"Skipping life change with missing data: seat_id={seat_id}, life_total={life_total}"
+            )
             continue
 
         change = None
@@ -829,18 +890,29 @@ def _import_life_changes(match: Match, match_data: MatchData) -> None:
 
         prev_life[seat_id] = life_total
 
-        changes_to_create.append(
-            LifeChange(
-                match=match,
-                game_state_id=lc.get("game_state_id"),
-                turn_number=lc.get("turn_number"),
-                seat_id=seat_id,
-                life_total=life_total,
-                change=change,
+        try:
+            changes_to_create.append(
+                LifeChange(
+                    match=match,
+                    game_state_id=lc.get("game_state_id"),
+                    turn_number=lc.get("turn_number"),
+                    seat_id=seat_id,
+                    life_total=life_total,
+                    change_amount=change,  # Fixed: was 'change', should be 'change_amount'
+                    source_instance_id=lc.get("source_instance_id"),
+                )
             )
-        )
+        except Exception as e:
+            logger.error(f"Error creating LifeChange object: {e}, data: {lc}", exc_info=True)
+            raise
 
-    LifeChange.objects.bulk_create(changes_to_create)
+    if changes_to_create:
+        try:
+            LifeChange.objects.bulk_create(changes_to_create)
+            logger.debug(f"Created {len(changes_to_create)} life changes")
+        except Exception as e:
+            logger.error(f"Error bulk creating life changes: {e}", exc_info=True)
+            raise
 
 
 def _import_zone_transfers(match: Match, match_data: MatchData) -> None:
@@ -848,19 +920,39 @@ def _import_zone_transfers(match: Match, match_data: MatchData) -> None:
     transfers_to_create = []
 
     for zt in match_data.zone_transfers:
+        instance_id = zt.get("instance_id")
+        from_zone = zt.get("from_zone")
+        to_zone = zt.get("to_zone")
+
+        if not instance_id or not from_zone or not to_zone:
+            logger.debug(
+                f"Skipping zone transfer with missing data: instance_id={instance_id}, from={from_zone}, to={to_zone}"
+            )
+            continue
+
         card_grp_id = zt.get("card_grp_id")
 
-        transfers_to_create.append(
-            ZoneTransfer(
-                match=match,
-                game_state_id=zt.get("game_state_id"),
-                turn_number=zt.get("turn_number"),
-                instance_id=zt.get("instance_id"),
-                card_id=card_grp_id,
-                from_zone=zt.get("from_zone"),
-                to_zone=zt.get("to_zone"),
-                seat_id=zt.get("seat_id"),
+        try:
+            transfers_to_create.append(
+                ZoneTransfer(
+                    match=match,
+                    game_state_id=zt.get("game_state_id"),
+                    turn_number=zt.get("turn_number"),
+                    instance_id=instance_id,
+                    card_id=card_grp_id,
+                    owner_seat_id=zt.get("owner_seat_id"),
+                    from_zone=from_zone,
+                    to_zone=to_zone,
+                )
             )
-        )
+        except Exception as e:
+            logger.error(f"Error creating ZoneTransfer object: {e}, data: {zt}", exc_info=True)
+            raise
 
-    ZoneTransfer.objects.bulk_create(transfers_to_create)
+    if transfers_to_create:
+        try:
+            ZoneTransfer.objects.bulk_create(transfers_to_create)
+            logger.debug(f"Created {len(transfers_to_create)} zone transfers")
+        except Exception as e:
+            logger.error(f"Error bulk creating zone transfers: {e}", exc_info=True)
+            raise

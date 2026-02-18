@@ -185,6 +185,12 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
+- **Import logging**: Comprehensive logging added to import process for debugging
+  - Logger name: `stats.views`
+  - INFO level: Match-level progress, import summaries
+  - DEBUG level: Detailed per-operation logging (deck creation, card lookups, bulk creates)
+  - ERROR level: Full exception tracebacks with context data
+  - Fixed bug: LifeChange model uses `change_amount` field (was incorrectly `change`)
 - **Card image caching**: Deck gallery view downloads and caches Scryfall card images locally
   - Images stored in `data/cache/card_images/`
   - One-click batch download for all cards in a deck
