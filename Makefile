@@ -6,10 +6,10 @@
 .PHONY: help install install-dev setup migrate run test lint format check clean download-cards import-log
 
 # Default Python interpreter
-PYTHON := python3
-PIP := pip
 VENV := .venv
 VENV_BIN := $(VENV)/bin
+PYTHON := $(VENV_BIN)/python3
+PIP := $(VENV_BIN)/pip
 
 # Colors for terminal output
 BLUE := \033[0;34m
@@ -118,20 +118,20 @@ import-default: ## Import default log file (data/Player.log)
 
 format: ## Format code with black and isort
 	@echo "$(BLUE)Formatting code with isort...$(NC)"
-	isort src/ stats/ tests/ mtgas_project/
+	$(VENV_BIN)/isort src/ stats/ tests/ mtgas_project/
 	@echo "$(BLUE)Formatting code with black...$(NC)"
-	black src/ stats/ tests/ mtgas_project/
+	$(VENV_BIN)/black src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Code formatted$(NC)"
 
 format-check: ## Check code formatting without making changes
 	@echo "$(BLUE)Checking code formatting...$(NC)"
-	isort --check-only --diff src/ stats/ tests/ mtgas_project/
-	black --check --diff src/ stats/ tests/ mtgas_project/
+	$(VENV_BIN)/isort --check-only --diff src/ stats/ tests/ mtgas_project/
+	$(VENV_BIN)/black --check --diff src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Format check complete$(NC)"
 
 lint: ## Run flake8 linter
 	@echo "$(BLUE)Running flake8 linter...$(NC)"
-	flake8 src/ stats/ tests/ mtgas_project/
+	$(VENV_BIN)/flake8 src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Linting complete$(NC)"
 
 lint-css: ## Run stylelint on CSS files
@@ -153,27 +153,27 @@ check: format-check lint lint-css ## Run all code quality checks (format + lint)
 
 test: ## Run all tests
 	@echo "$(BLUE)Running tests...$(NC)"
-	pytest
+	$(VENV_BIN)/pytest
 	@echo "$(GREEN)Tests complete$(NC)"
 
 test-verbose: ## Run tests with verbose output
 	@echo "$(BLUE)Running tests (verbose)...$(NC)"
-	pytest -v --tb=long
+	$(VENV_BIN)/pytest -v --tb=long
 	@echo "$(GREEN)Tests complete$(NC)"
 
 test-cov: ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage...$(NC)"
-	pytest --cov=stats --cov=src --cov-report=html --cov-report=term
+	$(VENV_BIN)/pytest --cov=stats --cov=src --cov-report=html --cov-report=term
 	@echo "$(GREEN)Coverage report generated in htmlcov/$(NC)"
 
 test-parser: ## Run only parser tests
-	pytest tests/test_parser.py -v
+	$(VENV_BIN)/pytest tests/test_parser.py -v
 
 test-models: ## Run only model tests
-	pytest tests/test_models.py -v
+	$(VENV_BIN)/pytest tests/test_models.py -v
 
 test-views: ## Run only view tests
-	pytest tests/test_views.py -v
+	$(VENV_BIN)/pytest tests/test_views.py -v
 
 # =============================================================================
 # Cleanup

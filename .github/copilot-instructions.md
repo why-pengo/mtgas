@@ -10,14 +10,14 @@ Django web application for tracking and analyzing Magic: The Gathering Arena gam
 
 ### Setup
 ```bash
-make setup              # Install dev dependencies + run migrations
+make setup              # Install dev dependencies + run migrations (installs into .venv)
 make download-cards     # Download Scryfall bulk data (one-time, ~350MB)
 ```
 
 ### Development
 ```bash
-make run                # Start Django dev server on http://127.0.0.1:8000
-python manage.py shell  # Django shell
+make run                        # Start Django dev server on http://127.0.0.1:8000
+.venv/bin/python manage.py shell  # Django shell
 make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
 # Or use web UI: http://127.0.0.1:8000/import/
 # Card data management: http://127.0.0.1:8000/card-data/
@@ -25,11 +25,11 @@ make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
 
 ### Testing
 ```bash
-pytest                          # Run all tests
-pytest tests/test_parser.py     # Run specific test file
-pytest tests/test_models.py::TestMatchModel  # Run specific test class
-pytest -k "test_parse_match"    # Run tests matching pattern
-pytest --cov=stats --cov=src    # Run with coverage
+.venv/bin/pytest                          # Run all tests
+.venv/bin/pytest tests/test_parser.py     # Run specific test file
+.venv/bin/pytest tests/test_models.py::TestMatchModel  # Run specific test class
+.venv/bin/pytest -k "test_parse_match"    # Run tests matching pattern
+.venv/bin/pytest --cov=stats --cov=src    # Run with coverage
 ```
 
 ### Code Quality
@@ -39,6 +39,7 @@ make lint        # Run flake8 (max-line-length=100)
 make lint-css    # Run stylelint on CSS files
 make check       # Run format-check + lint + lint-css
 make ci          # Run check + test (use before commits)
+# Note: make targets invoke .venv/bin/* tools directly; no need to activate venv
 ```
 
 ## Project Structure
