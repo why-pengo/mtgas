@@ -56,6 +56,7 @@
                     <th>Format</th>
                     <th>Turns</th>
                     <th>Duration</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -80,10 +81,11 @@
                     <td>{{ match.event_id|default:"-" }}</td>
                     <td>{{ match.total_turns|default:"-" }}</td>
                     <td>{{ match.duration_display|default:"-" }}</td>
+                    <td><a href="{% url 'stats:match_replay' match.id %}" title="Replay">▶</a></td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">No matches found</td>
+                    <td colspan="8" class="text-center text-muted">No matches found</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Replay — {{ match.opponent_name|default:"Unknown" }} — MTG Arena Stats{% endblock %}
+
+{% block extra_css %}
+<style>
+    .replay-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .replay-stage {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+        min-height: 420px;
+    }
+
+    .replay-card-area {
+        flex: 0 0 242px;
+    }
+
+    .replay-card-area img {
+        width: 242px;
+        border-radius: 10px;
+        box-shadow: 0 8px 32px rgb(0 0 0 / 50%);
+        display: block;
+    }
+
+    .replay-card-placeholder {
+        width: 242px;
+        height: 338px;
+        border-radius: 10px;
+        background-color: var(--bg-header);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-size: 2rem;
+    }
+
+    .replay-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .replay-turn-badge {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .replay-description {
+        font-size: 1.4rem;
+        font-weight: 600;
+        line-height: 1.3;
+        min-height: 3rem;
+    }
+
+    .replay-actor-you { color: #64b5f6; }
+    .replay-actor-opp { color: #ffb74d; }
+
+    .life-totals {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .life-block {
+        text-align: center;
+        min-width: 80px;
+    }
+
+    .life-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: var(--accent);
+        line-height: 1;
+    }
+
+    .life-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .replay-progress {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .replay-controls {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .replay-progress-bar-wrap {
+        height: 4px;
+        background-color: var(--bg-header);
+        border-radius: 2px;
+        margin: 0.5rem 0 1rem;
+    }
+
+    .replay-progress-bar-fill {
+        height: 100%;
+        background-color: var(--accent);
+        border-radius: 2px;
+        transition: width 0.2s ease;
+    }
+
+    .replay-no-data {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="replay-container">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{% url 'stats:matches' %}">Matches</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'stats:match_detail' match.id %}">{{ match.start_time|date:"M d, Y H:i"|default:"Match" }}</a></li>
+                    <li class="breadcrumb-item active">Replay</li>
+                </ol>
+            </nav>
+            <h2 class="mb-0">
+                Match Replay
+                <span class="fs-5 fw-normal text-muted">vs {{ match.opponent_name|default:"Unknown" }}</span>
+            </h2>
+        </div>
+        <span class="badge fs-6 {% if match.result == 'win' %}bg-success{% elif match.result == 'loss' %}bg-danger{% else %}bg-secondary{% endif %}">
+            {% if match.result == 'win' %}✓ Win{% elif match.result == 'loss' %}✗ Loss{% else %}{{ match.result|default:"Incomplete"|capfirst }}{% endif %}
+        </span>
+    </div>
+
+    {% if total_steps == 0 %}
+    <div class="card">
+        <div class="replay-no-data">
+            <div style="font-size:3rem">🃏</div>
+            <p class="mt-3">No play-by-play data recorded for this match.</p>
+            <a href="{% url 'stats:match_detail' match.id %}" class="btn btn-primary">Back to Match</a>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Progress bar -->
+    <div class="replay-progress-bar-wrap">
+        <div class="replay-progress-bar-fill" id="progressFill" style="width:0%"></div>
+    </div>
+
+    <!-- Stage -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="replay-stage">
+
+                <!-- Card image -->
+                <div class="replay-card-area">
+                    <img id="replayCardImg" src="" alt="Card" style="display:none">
+                    <div id="replayCardPlaceholder" class="replay-card-placeholder">🃏</div>
+                </div>
+
+                <!-- Info panel -->
+                <div class="replay-info">
+                    <div class="replay-turn-badge" id="replayTurnBadge">Turn — —</div>
+                    <div class="replay-description" id="replayDescription">—</div>
+
+                    <div class="life-totals">
+                        <div class="life-block">
+                            <div class="life-value" id="lifeYou">20</div>
+                            <div class="life-label">You</div>
+                        </div>
+                        <div class="life-block">
+                            <div class="life-value" id="lifeOpp">20</div>
+                            <div class="life-label">Opponent</div>
+                        </div>
+                    </div>
+
+                    <div class="replay-progress" id="replayProgress">Step 0 of {{ total_steps }}</div>
+
+                    <div class="replay-controls">
+                        <button class="btn btn-outline-secondary btn-sm" id="btnFirst" title="First">⏮</button>
+                        <button class="btn btn-secondary" id="btnPrev">◀ Prev</button>
+                        <button class="btn btn-primary" id="btnNext">Next ▶</button>
+                        <button class="btn btn-outline-secondary btn-sm" id="btnLast" title="Last">⏭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if total_steps %}
+<script>
+(function () {
+    const steps = {{ steps_json|safe }};
+    let idx = 0;
+
+    const imgEl       = document.getElementById("replayCardImg");
+    const placeholder = document.getElementById("replayCardPlaceholder");
+    const turnBadge   = document.getElementById("replayTurnBadge");
+    const descEl      = document.getElementById("replayDescription");
+    const lifeYou     = document.getElementById("lifeYou");
+    const lifeOpp     = document.getElementById("lifeOpp");
+    const progressEl  = document.getElementById("replayProgress");
+    const progressFill = document.getElementById("progressFill");
+    const btnPrev     = document.getElementById("btnPrev");
+    const btnNext     = document.getElementById("btnNext");
+    const btnFirst    = document.getElementById("btnFirst");
+    const btnLast     = document.getElementById("btnLast");
+
+    function render() {
+        const s = steps[idx];
+
+        // Turn / phase badge
+        const turn = s.turn != null ? `Turn ${s.turn}` : "Unknown Turn";
+        const phase = s.phase || "";
+        turnBadge.textContent = phase ? `${turn} — ${phase}` : turn;
+
+        // Description with actor colour
+        const actorClass = s.actor === "You" ? "replay-actor-you" : "replay-actor-opp";
+        descEl.innerHTML =
+            `<span class="${actorClass}">${s.actor}</span> — ${s.action}` +
+            (s.card_name ? `: <strong>${s.card_name}</strong>` : "");
+
+        // Life totals
+        lifeYou.textContent = s.life_you;
+        lifeOpp.textContent = s.life_opp;
+
+        // Card image
+        if (s.card_image) {
+            imgEl.style.display = "none";
+            placeholder.style.display = "flex";
+            imgEl.onerror = s.card_fallback
+                ? function () { imgEl.src = s.card_fallback; imgEl.onerror = null; }
+                : function () { imgEl.style.display = "none"; placeholder.style.display = "flex"; imgEl.onerror = null; };
+            imgEl.onload = function () {
+                placeholder.style.display = "none";
+                imgEl.style.display = "block";
+            };
+            imgEl.src = s.card_image;
+        } else {
+            imgEl.style.display = "none";
+            placeholder.style.display = "flex";
+        }
+
+        // Progress
+        const stepNum = idx + 1;
+        progressEl.textContent = `Step ${stepNum} of ${steps.length}`;
+        progressFill.style.width = `${(stepNum / steps.length) * 100}%`;
+
+        // Button states
+        btnPrev.disabled = idx === 0;
+        btnFirst.disabled = idx === 0;
+        btnNext.disabled = idx === steps.length - 1;
+        btnLast.disabled = idx === steps.length - 1;
+    }
+
+    btnNext.addEventListener("click",  function () { if (idx < steps.length - 1) { idx++; render(); } });
+    btnPrev.addEventListener("click",  function () { if (idx > 0) { idx--; render(); } });
+    btnFirst.addEventListener("click", function () { idx = 0; render(); });
+    btnLast.addEventListener("click",  function () { idx = steps.length - 1; render(); });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") { if (idx < steps.length - 1) { idx++; render(); } }
+        if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   { if (idx > 0) { idx--; render(); } }
+    });
+
+    render();
+})();
+</script>
+{% endif %}
+{% endblock %}

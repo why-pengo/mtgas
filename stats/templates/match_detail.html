@@ -21,6 +21,7 @@
             {% if match.duration_display %}• {{ match.duration_display }}{% endif %}
             • {{ match.total_turns|default:"?" }} turns
         </p>
+        <a href="{% url 'stats:match_replay' match.id %}" class="btn btn-sm btn-outline-secondary">▶ Replay</a>
     </div>
 </div>
 
@@ -104,28 +105,29 @@
         <div class="card">
             <div class="card-header">Game Timeline</div>
             <div class="card-body scrollable-timeline">
-                {% regroup actions by turn_number as turns %}
+                {% regroup timeline by turn as turns %}
                 {% for turn in turns %}
                 <div class="mb-3">
                     <h6 class="border-bottom pb-1">Turn {{ turn.grouper|default:"?" }}</h6>
-                    {% for action in turn.list %}
+                    {% for event in turn.list %}
                     <div class="small mb-1 ps-2">
-                        <span class="{% if action.seat_id == match.player_seat_id %}text-info{% else %}text-warning{% endif %}">
-                            {% if action.seat_id == match.player_seat_id %}You{% else %}Opponent{% endif %}
-                        </span>
-                        - {{ action.action_type|slice:"11:" }}
-                        {% if action.card %}
-                        <strong><a href="https://scryfall.com/search?q=!%22{{ action.card.name|urlencode }}%22" target="_blank" rel="noopener"
-                           class="card-link"
-                           data-card-image="/static/card_images/{{ action.card.grp_id }}.jpg"
-                           data-card-fallback="{{ action.card.image_uri|default:'' }}">{{ action.card.name }}</a></strong>
+                        {% if event.actor == "you" %}
+                        <span class="text-info">You</span>
+                        {% elif event.actor == "opponent" %}
+                        <span class="text-warning">Opponent</span>
                         {% endif %}
-                        <span class="text-muted">({{ action.phase|slice:"6:"|default:"" }})</span>
+                        — {{ event.verb }}
+                        {% if event.card %}
+                        <strong><a href="https://scryfall.com/search?q=!%22{{ event.card.name|urlencode }}%22" target="_blank" rel="noopener"
+                           class="card-link"
+                           data-card-image="/static/card_images/{{ event.card.grp_id }}.jpg"
+                           data-card-fallback="{{ event.card.image_uri|default:'' }}">{{ event.card.name }}</a></strong>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
                 {% empty %}
-                <p class="text-muted">No action data available</p>
+                <p class="text-muted">No timeline data available</p>
                 {% endfor %}
             </div>
         </div>
