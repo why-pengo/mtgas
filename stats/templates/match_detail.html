@@ -75,7 +75,10 @@
                 {% for dc in deck_cards %}
                 <div>{{ dc.quantity }}x
                     {% if dc.card.name %}
-                    <a href="https://scryfall.com/search?q=!%22{{ dc.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ dc.card.name }}</a>
+                    <a href="https://scryfall.com/search?q=!%22{{ dc.card.name|urlencode }}%22" target="_blank" rel="noopener"
+                       class="card-link"
+                       data-card-image="/static/card_images/{{ dc.card.grp_id }}.jpg"
+                       data-card-fallback="{{ dc.card.image_uri|default:'' }}">{{ dc.card.name }}</a>
                     {% else %}
                     Unknown
                     {% endif %}
@@ -112,7 +115,10 @@
                         </span>
                         - {{ action.action_type|slice:"11:" }}
                         {% if action.card %}
-                        <strong><a href="https://scryfall.com/search?q=!%22{{ action.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ action.card.name }}</a></strong>
+                        <strong><a href="https://scryfall.com/search?q=!%22{{ action.card.name|urlencode }}%22" target="_blank" rel="noopener"
+                           class="card-link"
+                           data-card-image="/static/card_images/{{ action.card.grp_id }}.jpg"
+                           data-card-fallback="{{ action.card.image_uri|default:'' }}">{{ action.card.name }}</a></strong>
                         {% endif %}
                         <span class="text-muted">({{ action.phase|slice:"6:"|default:"" }})</span>
                     </div>

@@ -90,7 +90,10 @@
                 <div class="small">
                     {{ item.quantity }}x
                     {% if item.card.name %}
-                    <a href="https://scryfall.com/search?q=!%22{{ item.card.name|urlencode }}%22" target="_blank" rel="noopener" class="card-link">{{ item.card.name }}</a>
+                    <a href="https://scryfall.com/search?q=!%22{{ item.card.name|urlencode }}%22" target="_blank" rel="noopener"
+                       class="card-link"
+                       data-card-image="/static/card_images/{{ item.card.grp_id }}.jpg"
+                       data-card-fallback="{{ item.card.image_uri|default:'' }}">{{ item.card.name }}</a>
                     {% else %}
                     Unknown
                     {% endif %}

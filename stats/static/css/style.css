@@ -43,6 +43,25 @@
 }
 
 /* =============================================================================
+   Card Preview Popup
+   ============================================================================= */
+#card-preview-popup {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 60%);
+    overflow: hidden;
+    width: 242px;
+}
+
+#card-preview-popup img {
+    display: block;
+    width: 100%;
+}
+
+/* =============================================================================
    Light Mode Variables
    ============================================================================= */
 html[data-theme="light"] {
