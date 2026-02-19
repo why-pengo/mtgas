@@ -7,6 +7,13 @@
     <title>{% block title %}MTG Arena Stats{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    <script>
+        // Apply saved theme before first paint to avoid flash
+        (function () {
+            const theme = localStorage.getItem("theme") || "dark";
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     {% block extra_css %}{% endblock %}
 </head>
@@ -40,6 +47,7 @@
                         <a class="nav-link" href="{% url 'stats:card_data' %}">Cards</a>
                     </li>
                 </ul>
+                <button id="theme-toggle" class="theme-toggle ms-auto" aria-label="Toggle theme">☀</button>
             </div>
         </div>
     </nav>
@@ -53,6 +61,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/app.js' %}"></script>
     <script src="{% static 'js/charts.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>

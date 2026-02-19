@@ -43,6 +43,37 @@
 }
 
 /* =============================================================================
+   Light Mode Variables
+   ============================================================================= */
+html[data-theme="light"] {
+    --bg-dark: #f0f2f5;
+    --bg-card: #fff;
+    --bg-header: #dde3ed;
+    --accent: #d63251;
+    --accent-hover: #b02040;
+    --text-primary: #212529;
+    --text-muted: #6c757d;
+    --bs-body-color: #212529;
+    --bs-body-bg: #f0f2f5;
+    --bs-secondary-color: #6c757d;
+    --bs-secondary-bg: #fff;
+    --bs-tertiary-color: #495057;
+    --bs-tertiary-bg: #dde3ed;
+    --bs-emphasis-color: #000;
+    --bs-border-color: #c5cfe0;
+    --bs-heading-color: #212529;
+    --bs-link-color: #d63251;
+    --bs-link-hover-color: #a02040;
+    --bs-code-color: #d63251;
+    --bs-table-color: #212529;
+    --bs-table-bg: transparent;
+    --bs-table-striped-color: #212529;
+    --bs-table-striped-bg: rgb(0 0 0 / 3%);
+    --bs-table-hover-color: #212529;
+    --bs-table-hover-bg: rgb(0 0 0 / 5%);
+}
+
+/* =============================================================================
    Base Styles
    ============================================================================= */
 body {
@@ -315,4 +346,96 @@ pre code {
     font-size: 12px;
     pointer-events: none;
     z-index: 1000;
+}
+
+/* =============================================================================
+   Light Mode Component Overrides
+   ============================================================================= */
+html[data-theme="light"] .win {
+    color: #2e7d32;
+}
+
+html[data-theme="light"] .loss {
+    color: #c62828;
+}
+
+html[data-theme="light"] .draw {
+    color: #e65100;
+}
+
+html[data-theme="light"] .incomplete {
+    color: #757575;
+}
+
+html[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgb(0 0 0 / 3%);
+}
+
+html[data-theme="light"] .grid line {
+    stroke: rgb(0 0 0 / 10%);
+}
+
+html[data-theme="light"] .mana-B {
+    color: #555;
+}
+
+html[data-theme="light"] a.card-link {
+    color: #1565c0;
+}
+
+html[data-theme="light"] a.card-link:hover {
+    color: #0d47a1;
+}
+
+/* =============================================================================
+   Theme Toggle Button
+   ============================================================================= */
+.theme-toggle {
+    background: none;
+    border: 1px solid rgb(255 255 255 / 30%);
+    border-radius: 20px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 4px 10px;
+    transition:
+        border-color 0.2s,
+        color 0.2s;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+html[data-theme="light"] .navbar {
+    background-color: var(--bg-card) !important;
+}
+
+html[data-theme="light"] .navbar .navbar-brand,
+html[data-theme="light"] .navbar .nav-link {
+    color: #212529 !important;
+}
+
+html[data-theme="light"] .navbar .nav-link:hover {
+    color: var(--accent) !important;
+}
+
+html[data-theme="light"] .navbar-toggler {
+    border-color: rgb(0 0 0 / 20%);
+}
+
+html[data-theme="light"] pre.bg-dark {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
+}
+
+html[data-theme="light"] pre.bg-dark code {
+    color: #212529;
+}
+
+html[data-theme="light"] .bg-black {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
 }
