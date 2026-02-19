@@ -96,6 +96,8 @@ class Command(BaseCommand):
                     continue
 
                 try:
+                    if force:
+                        Match.objects.filter(match_id=match_data.match_id).delete()
                     self._import_match(match_data, scryfall)
                     imported_count += 1
                     self.stdout.write(

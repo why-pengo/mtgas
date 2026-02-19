@@ -96,15 +96,15 @@ The `_zone_verb()` function maps `(from_role, to_role)` pairs to human-readable 
 
 ## Life Total Tracking
 
-Life totals are stored in `LifeChange` records keyed by `game_state_id`. The view builds a dict mapping `game_state_id → {seat_id: life_total}` in a single pass, then maintains a running `current_life` dict that is updated each time a new `game_state_id` boundary is crossed while iterating over zone transfers. Each replay step snapshot includes the life totals current at that point.
+Life totals are stored in `LifeChange` records keyed by `game_state_id`. Because life-change events and zone-transfer events use different `game_state_id` values and never share the same ID, the view builds a sorted list of life events and performs a linear scan: as each zone transfer is processed, all life changes with a `game_state_id` ≤ the transfer's are applied to a running `current_life` dict. Each replay step snapshot includes the life totals current at that point.
 
-Only the player's life changes are reliably captured (the parser tracks the player's seat). The opponent's life total defaults to 20 if no change has been recorded.
+Both the player's and opponent's life changes are captured by the parser and stored as separate `LifeChange` rows (distinguished by `seat_id`).
 
 ---
 
 ## Data Limitations
 
-- **`turn_number = 0`** on some events: Zone transfers that occur during initialisation (e.g. opening-hand reveals) or in certain game-state snapshots may have `turn_number` stored as `0` rather than the actual turn. This is a parser data-quality issue, not a replay logic issue.
+- **`turn_number = 0`** on some events: Resolved by the parser now tracking the last-seen turn number and applying it to subsequent messages that lack `turnInfo`. Opening-hand reveals and similar pre-game transfers may still show turn 0 as expected.
 - **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as "Unknown Card (grp_id)". Run `make download-cards` to populate the cache.
 - **Opponent's cards**: Cards played from the opponent's hand only become known when they enter the battlefield. Prior to that they appear as anonymous transfers.
 

@@ -205,16 +205,13 @@ def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
         None,
     )
 
-    # Build running life totals keyed by game_state_id
-    life_at_gsid: dict[int, dict[int, int]] = {}
-    running_life: dict[int, int] = {}
-    for lc in life_changes:
-        gsid = lc.game_state_id or 0
-        running_life[lc.seat_id] = lc.life_total
-        life_at_gsid[gsid] = dict(running_life)
-
+    # Build life events sorted by gsid for linear scan
+    life_events = sorted(
+        [(lc.game_state_id or 0, lc.seat_id, lc.life_total) for lc in life_changes],
+        key=lambda x: x[0],
+    )
+    life_idx = 0
     current_life: dict[int, int] = {}
-    seen_gsids: set[int] = set()
     timeline: list[dict] = []
 
     for zt in zone_transfers:
@@ -222,10 +219,11 @@ def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
             continue
 
         gsid = zt.game_state_id or 0
-        if gsid not in seen_gsids:
-            if gsid in life_at_gsid:
-                current_life.update(life_at_gsid[gsid])
-            seen_gsids.add(gsid)
+        # Advance life changes up to (and including) current gsid
+        while life_idx < len(life_events) and life_events[life_idx][0] <= gsid:
+            _, seat, life = life_events[life_idx]
+            current_life[seat] = life
+            life_idx += 1
 
         fz = str(zt.from_zone) if zt.from_zone is not None else ""
         tz = str(zt.to_zone) if zt.to_zone is not None else ""
@@ -520,16 +518,13 @@ def match_replay(request: HttpRequest, match_id: int) -> HttpResponse:
         None,
     )
 
-    # Build life-total timeline: game_state_id -> {seat_id: life_total}
-    life_at_gsid: dict[int, dict[int, int]] = {}
-    running_life: dict[int, int] = {}
-    for lc in life_changes:
-        gsid = lc.game_state_id or 0
-        running_life[lc.seat_id] = lc.life_total
-        life_at_gsid[gsid] = dict(running_life)
-
+    # Build life events sorted by gsid for linear scan
+    life_events = sorted(
+        [(lc.game_state_id or 0, lc.seat_id, lc.life_total) for lc in life_changes],
+        key=lambda x: x[0],
+    )
+    life_idx = 0
     current_life: dict[int, int] = {}
-    seen_gsids: set[int] = set()
     steps = []
 
     for zt in zone_transfers:
@@ -537,10 +532,11 @@ def match_replay(request: HttpRequest, match_id: int) -> HttpResponse:
             continue  # skip anonymous transfers
 
         gsid = zt.game_state_id or 0
-        if gsid not in seen_gsids:
-            if gsid in life_at_gsid:
-                current_life.update(life_at_gsid[gsid])
-            seen_gsids.add(gsid)
+        # Advance life changes up to (and including) current gsid
+        while life_idx < len(life_events) and life_events[life_idx][0] <= gsid:
+            _, seat, life = life_events[life_idx]
+            current_life[seat] = life
+            life_idx += 1
 
         fz = str(zt.from_zone) if zt.from_zone is not None else ""
         tz = str(zt.to_zone) if zt.to_zone is not None else ""

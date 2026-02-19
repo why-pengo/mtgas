@@ -120,6 +120,7 @@ class MTGALogParser:
         self.current_match: Optional[MatchData] = None
         self.completed_matches: List[MatchData] = []
         self._last_timestamp: Optional[datetime] = None
+        self._last_turn_number: int = 0  # Track last seen turn for messages without turnInfo
         self._parse_errors: List[Dict] = []  # Track non-fatal parse errors
 
     def parse_events(self) -> Generator[ParsedEvent, None, None]:
@@ -283,6 +284,7 @@ class MTGALogParser:
 
             # Start new match
             self.current_match = MatchData(match_id=match_id)
+            self._last_turn_number = 0
             if event.timestamp:
                 self.current_match.start_time = datetime.fromtimestamp(
                     event.timestamp / 1000, tz=timezone.utc
@@ -360,6 +362,10 @@ class MTGALogParser:
         # Extract turn info
         turn_info = game_state.get("turnInfo", {})
         turn_number = turn_info.get("turnNumber", 0)
+        if turn_number > 0:
+            self._last_turn_number = turn_number
+        elif self._last_turn_number > 0:
+            turn_number = self._last_turn_number
         if turn_number > self.current_match.total_turns:
             self.current_match.total_turns = turn_number
 
@@ -373,22 +379,21 @@ class MTGALogParser:
             self.current_match.format = game_info.get("superFormat")
             self.current_match.match_type = game_info.get("type")
 
-        # Extract player life totals
+        # Extract player life totals (both player and opponent)
         players = game_state.get("players", [])
         for player in players:
             seat = player.get("systemSeatNumber")
             life = player.get("lifeTotal")
 
-            if life is not None:
-                if seat == self.current_match.player_seat_id:
-                    self.current_match.life_changes.append(
-                        {
-                            "game_state_id": game_state_id,
-                            "turn_number": turn_number,
-                            "seat_id": seat,
-                            "life_total": life,
-                        }
-                    )
+            if life is not None and seat is not None:
+                self.current_match.life_changes.append(
+                    {
+                        "game_state_id": game_state_id,
+                        "turn_number": turn_number,
+                        "seat_id": seat,
+                        "life_total": life,
+                    }
+                )
 
         # Extract game objects (cards)
         game_objects = game_state.get("gameObjects", [])
