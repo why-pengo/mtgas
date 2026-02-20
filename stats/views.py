@@ -1374,7 +1374,6 @@ def _import_zone_transfers(match: Match, match_data: MatchData) -> None:
                     turn_number=zt.get("turn_number"),
                     instance_id=instance_id,
                     card_id=card_grp_id,
-                    owner_seat_id=zt.get("owner_seat_id"),
                     from_zone=from_zone,
                     to_zone=to_zone,
                 )
