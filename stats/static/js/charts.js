@@ -323,6 +323,14 @@ const MTGACharts = {
             .append('g')
             .attr('transform', `translate(${margin.left},${margin.top})`);
 
+        // Add clipping path to prevent bars from going outside grid
+        svg.append('defs')
+            .append('clipPath')
+            .attr('id', 'chart-clip')
+            .append('rect')
+            .attr('width', width)
+            .attr('height', height);
+
         // Parse dates
         const parseDate = d3.timeParse('%Y-%m-%d');
         data.forEach(d => {
@@ -374,9 +382,11 @@ const MTGACharts = {
             .attr('stroke-width', 2)
             .attr('d', line);
 
-        // Games bars
+        // Games bars (with clipping)
         const barWidth = Math.max(width / data.length - 4, 2);
-        svg.selectAll('.games-bar')
+        svg.append('g')
+            .attr('clip-path', 'url(#chart-clip)')
+            .selectAll('.games-bar')
             .data(data)
             .enter()
             .append('rect')

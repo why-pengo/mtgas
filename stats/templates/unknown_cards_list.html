@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Unknown Cards - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Unknown Cards</h1>
+        <p class="text-muted">
+            Cards discovered during import that were not found in Scryfall's bulk data. 
+            You can manually provide correct names for these cards.
+        </p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="alert alert-info">
+            <strong>{{ total_unresolved }}</strong> unresolved unknown card(s)
+            {% if total_resolved > 0 %}
+                | <strong>{{ total_resolved }}</strong> resolved
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="btn-group" role="group">
+            <a href="{% url 'stats:unknown_cards_list' %}" 
+               class="btn btn-sm {% if not show_resolved %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Show Unresolved
+            </a>
+            <a href="{% url 'stats:unknown_cards_list' %}?show_resolved=true" 
+               class="btn btn-sm {% if show_resolved %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Show All
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if unknown_list %}
+<div class="row">
+    <div class="col">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>GRP ID</th>
+                        <th>Current Name</th>
+                        <th>Occurrences</th>
+                        <th>Decks</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in unknown_list %}
+                    <tr>
+                        <td>
+                            <code>{{ item.card.grp_id }}</code>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">{{ item.card.name }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ item.total_count }}</span>
+                        </td>
+                        <td>
+                            {% if item.deck_names %}
+                                {{ item.deck_names }}
+                            {% else %}
+                                <em class="text-muted">No deck</em>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'stats:unknown_card_fix' item.card.grp_id %}" 
+                               class="btn btn-sm btn-primary">
+                                Fix Name
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col">
+        <div class="alert alert-success">
+            <strong>✓ No unknown cards found!</strong>
+            {% if show_resolved %}
+                All unknown cards have been resolved.
+            {% else %}
+                Try importing more log files or check the "Show All" view.
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mt-4">
+    <div class="col">
+        <a href="{% url 'stats:dashboard' %}" class="btn btn-secondary">
+            ← Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

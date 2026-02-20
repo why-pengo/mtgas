@@ -263,3 +263,44 @@ class ImportSession(models.Model):
 
     def __str__(self) -> str:
         return f"Import {self.started_at.strftime('%Y-%m-%d %H:%M')} - {self.status}"
+
+
+class UnknownCard(models.Model):
+    """Tracks unknown cards discovered during import for manual resolution."""
+
+    card = models.ForeignKey(
+        Card, on_delete=models.CASCADE, related_name="unknown_occurrences", db_column="grp_id"
+    )
+    match = models.ForeignKey(
+        Match, on_delete=models.SET_NULL, null=True, blank=True, related_name="unknown_cards"
+    )
+    deck = models.ForeignKey(
+        Deck, on_delete=models.SET_NULL, null=True, blank=True, related_name="unknown_cards"
+    )
+    import_session = models.ForeignKey(
+        ImportSession,
+        on_delete=models.CASCADE,
+        related_name="unknown_cards",
+        help_text="Import session where this unknown card was discovered",
+    )
+    raw_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Raw card data from log file if available (for debugging)",
+    )
+    is_resolved = models.BooleanField(
+        default=False, help_text="Whether card has been manually resolved"
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "unknown_cards"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_resolved"]),
+            models.Index(fields=["card", "is_resolved"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Unknown: {self.card.name} (grp_id: {self.card.grp_id})"

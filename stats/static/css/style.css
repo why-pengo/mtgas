@@ -17,16 +17,16 @@
     --accent: #ff4d6d;
     --accent-hover: #e83a5c;
     --text-primary: #f2f2f2;
-    --text-muted: #aaa;
+    --text-muted: #aaaaaa;
 
     /* Bootstrap variable overrides */
     --bs-body-color: #f2f2f2;
     --bs-body-bg: #1c1c35;
-    --bs-secondary-color: #aaa;
+    --bs-secondary-color: #aaaaaa;
     --bs-secondary-bg: #1e2d52;
-    --bs-tertiary-color: #888;
+    --bs-tertiary-color: #888888;
     --bs-tertiary-bg: #1a4a8a;
-    --bs-emphasis-color: #fff;
+    --bs-emphasis-color: #ffffff;
     --bs-border-color: #1a4a8a;
     --bs-heading-color: #f2f2f2;
     --bs-link-color: #ff4d6d;
@@ -34,12 +34,12 @@
     --bs-code-color: #ff4d6d;
 
     /* Bootstrap table overrides */
-    --bs-table-color: #eee;
+    --bs-table-color: #eeeeee;
     --bs-table-bg: transparent;
-    --bs-table-striped-color: #eee;
-    --bs-table-striped-bg: rgb(255 255 255 / 5%);
-    --bs-table-hover-color: #eee;
-    --bs-table-hover-bg: rgb(255 255 255 / 7.5%);
+    --bs-table-striped-color: #eeeeee;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+    --bs-table-hover-color: #eeeeee;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.075);
 }
 
 /* =============================================================================
@@ -51,7 +51,7 @@
     z-index: 9999;
     pointer-events: none;
     border-radius: 10px;
-    box-shadow: 0 8px 32px rgb(0 0 0 / 60%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     overflow: hidden;
     width: 242px;
 }
@@ -66,7 +66,7 @@
    ============================================================================= */
 html[data-theme="light"] {
     --bg-dark: #f0f2f5;
-    --bg-card: #fff;
+    --bg-card: #ffffff;
     --bg-header: #dde3ed;
     --accent: #d63251;
     --accent-hover: #b02040;
@@ -75,10 +75,10 @@ html[data-theme="light"] {
     --bs-body-color: #212529;
     --bs-body-bg: #f0f2f5;
     --bs-secondary-color: #6c757d;
-    --bs-secondary-bg: #fff;
+    --bs-secondary-bg: #ffffff;
     --bs-tertiary-color: #495057;
     --bs-tertiary-bg: #dde3ed;
-    --bs-emphasis-color: #000;
+    --bs-emphasis-color: #000000;
     --bs-border-color: #c5cfe0;
     --bs-heading-color: #212529;
     --bs-link-color: #d63251;
@@ -87,9 +87,9 @@ html[data-theme="light"] {
     --bs-table-color: #212529;
     --bs-table-bg: transparent;
     --bs-table-striped-color: #212529;
-    --bs-table-striped-bg: rgb(0 0 0 / 3%);
+    --bs-table-striped-bg: rgba(0, 0, 0, 0.03);
     --bs-table-hover-color: #212529;
-    --bs-table-hover-bg: rgb(0 0 0 / 5%);
+    --bs-table-hover-bg: rgba(0, 0, 0, 0.05);
 }
 
 /* =============================================================================
@@ -128,7 +128,7 @@ body {
 }
 
 .table-striped > tbody > tr:nth-of-type(odd) {
-    background-color: rgb(255 255 255 / 5%);
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .table-sm {
@@ -186,7 +186,7 @@ body {
 }
 
 .mana-B {
-    color: #888;
+    color: #888888;
 }
 
 .mana-R {
@@ -294,7 +294,7 @@ pre code {
     background-color: var(--bg-header);
     border-color: var(--accent);
     color: var(--text-primary);
-    box-shadow: 0 0 0 0.25rem rgb(233 69 96 / 25%);
+    box-shadow: 0 0 0 0.25rem rgba(233, 69, 96, 0.25);
 }
 
 .form-label {
@@ -346,7 +346,7 @@ pre code {
    Grid Lines for Charts
    ============================================================================= */
 .grid line {
-    stroke: rgb(255 255 255 / 10%);
+    stroke: rgba(255, 255, 255, 0.1);
 }
 
 .grid path {
@@ -359,8 +359,8 @@ pre code {
 .chart-tooltip {
     position: absolute;
     padding: 8px 12px;
-    background-color: rgb(0 0 0 / 80%);
-    color: #fff;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
     border-radius: 4px;
     font-size: 12px;
     pointer-events: none;
@@ -387,15 +387,15 @@ html[data-theme="light"] .incomplete {
 }
 
 html[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) {
-    background-color: rgb(0 0 0 / 3%);
+    background-color: rgba(0, 0, 0, 0.03);
 }
 
 html[data-theme="light"] .grid line {
-    stroke: rgb(0 0 0 / 10%);
+    stroke: rgba(0, 0, 0, 0.1);
 }
 
 html[data-theme="light"] .mana-B {
-    color: #555;
+    color: #555555;
 }
 
 html[data-theme="light"] a.card-link {
@@ -411,7 +411,7 @@ html[data-theme="light"] a.card-link:hover {
    ============================================================================= */
 .theme-toggle {
     background: none;
-    border: 1px solid rgb(255 255 255 / 30%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 20px;
     color: var(--text-primary);
     cursor: pointer;
@@ -442,7 +442,7 @@ html[data-theme="light"] .navbar .nav-link:hover {
 }
 
 html[data-theme="light"] .navbar-toggler {
-    border-color: rgb(0 0 0 / 20%);
+    border-color: rgba(0, 0, 0, 0.2);
 }
 
 html[data-theme="light"] pre.bg-dark {
@@ -456,5 +456,33 @@ html[data-theme="light"] pre.bg-dark code {
 
 html[data-theme="light"] .bg-black {
     background-color: #e9ecef !important;
+    color: #212529 !important;
+}
+
+/* =============================================================================
+   Unknown Card Fix View
+   ============================================================================= */
+.raw-data-summary {
+    cursor: pointer;
+}
+
+.raw-data-sample {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    background-color: #2a2a3a !important;
+    color: #f0f0f0 !important;
+}
+
+.raw-data-sample code {
+    color: #f0f0f0 !important;
+}
+
+html[data-theme="light"] .raw-data-sample {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+html[data-theme="light"] .raw-data-sample code {
     color: #212529 !important;
 }

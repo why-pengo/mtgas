@@ -4,7 +4,7 @@ Django admin configuration for MTG Arena Statistics.
 
 from django.contrib import admin
 
-from .models import Card, Deck, DeckCard, ImportSession, Match
+from .models import Card, Deck, DeckCard, ImportSession, Match, UnknownCard
 
 
 @admin.register(Card)
@@ -52,3 +52,29 @@ class ImportSessionAdmin(admin.ModelAdmin):
         return obj.log_file[-50:] if obj.log_file else "-"
 
     log_file_short.short_description = "Log File"
+
+
+@admin.register(UnknownCard)
+class UnknownCardAdmin(admin.ModelAdmin):
+    list_display = (
+        "card_grp_id",
+        "card_name",
+        "deck",
+        "import_session",
+        "is_resolved",
+        "created_at",
+    )
+    list_filter = ("is_resolved", "created_at")
+    search_fields = ("card__grp_id", "card__name")
+    raw_id_fields = ("card", "match", "deck", "import_session")
+    date_hierarchy = "created_at"
+
+    def card_grp_id(self, obj):
+        return obj.card.grp_id
+
+    card_grp_id.short_description = "Card GRP ID"
+
+    def card_name(self, obj):
+        return obj.card.name
+
+    card_name.short_description = "Card Name"

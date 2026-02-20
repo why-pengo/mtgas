@@ -1,0 +1,34 @@
+Deck
+1 Drake Hatcher (FDN) 35
+10 Mountain (FDN) 278
+1 Niv-Mizzet, Visionary (FDN) 123
+1 Arcane Epiphany (FDN) 29
+1 Tolarian Terror (DMU) 72
+1 Two-Headed Hunter (WOE) 155
+11 Island (FDN) 275
+1 Balmor, Battlemage Captain (FDN) 237
+1 Enigma Drake (FDN) 657
+1 Mischievous Mystic (FDN) 47
+4 Burst Lightning (FDN) 192
+1 Sage's Nouliths (FIN) 70
+1 Underfoot Underdogs (TDM) 129
+1 Temple Trap (OM1) 176
+4 Swiftwater Cliffs (FDN) 268
+1 Decadent Dragon (WOE) 223
+1 Temple of Epiphany (FDN) 699
+4 Izzet Guildgate (FDN) 691
+1 Kazuo, Ruthless Rival (OM1) 83
+1 Bigfin Bouncer (FDN) 31
+1 High Fae Trickster (FDN) 40
+1 The Watcher on the Road (OM1) 48
+2 Quick Study (FDN) 513
+1 Hexing Squelcher (ECL) 145
+1 Draconautics Engineer (DFT) 121
+1 Chandra, Flameshaper (FDN) 81
+1 Clammy Prowler (DSK) 45
+1 Sunset Strikemaster (TDM) 126
+1 Glassworks // Shattered Yard (DSK) 137
+1 Bounce Off (DFT) 39
+1 Faebloom Trick (FDN) 38
+1 Dreadmaw's Ire (LCI) 147
+1 Abrade (FDN) 188

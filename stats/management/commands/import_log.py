@@ -29,6 +29,7 @@ from stats.models import (  # noqa: E402
     ImportSession,
     LifeChange,
     Match,
+    UnknownCard,
     ZoneTransfer,
 )
 
@@ -64,6 +65,9 @@ class Command(BaseCommand):
         session = ImportSession.objects.create(
             log_file=log_path, file_size=file_size, file_modified=file_modified, status="running"
         )
+
+        # Store session for use in import methods
+        self.import_session = session
 
         try:
             # Ensure card data is available
@@ -134,10 +138,6 @@ class Command(BaseCommand):
         if match_data.deck_id:
             deck = self._ensure_deck(match_data, scryfall)
 
-        # Collect all unique card IDs and ensure they're in the cards table
-        card_grp_ids = self._collect_card_ids(match_data)
-        self._ensure_cards(card_grp_ids, scryfall)
-
         # Calculate duration
         duration = None
         if match_data.start_time and match_data.end_time:
@@ -176,6 +176,11 @@ class Command(BaseCommand):
             total_turns=match_data.total_turns,
         )
 
+        # Collect all unique card IDs and ensure they're in the cards table
+        # Pass match and deck for unknown card tracking
+        card_grp_ids = self._collect_card_ids(match_data)
+        self._ensure_cards(card_grp_ids, scryfall, match, deck)
+
         # Import actions (significant ones only)
         self._import_actions(match, match_data)
 
@@ -198,9 +203,9 @@ class Command(BaseCommand):
         )
 
         if created and match_data.deck_cards:
-            # Ensure cards exist first
+            # Ensure cards exist first - pass None for match since it doesn't exist yet
             card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
-            self._ensure_cards(card_ids, scryfall)
+            self._ensure_cards(card_ids, scryfall, None, deck)
 
             # Add deck cards
             for card_data in match_data.deck_cards:
@@ -235,7 +240,7 @@ class Command(BaseCommand):
 
         return card_ids
 
-    def _ensure_cards(self, card_ids: Set[int], scryfall):
+    def _ensure_cards(self, card_ids: Set[int], scryfall, match=None, deck=None):
         """Ensure cards exist in database from Scryfall bulk data."""
         if not card_ids:
             return
@@ -249,6 +254,8 @@ class Command(BaseCommand):
             card_lookup = scryfall.lookup_cards_batch(missing_ids)
 
             cards_to_create = []
+            unknown_cards_to_log = []
+
             for grp_id, card_data in card_lookup.items():
                 if card_data:
                     cards_to_create.append(
@@ -270,10 +277,49 @@ class Command(BaseCommand):
                         )
                     )
                 else:
-                    # Unknown card placeholder
-                    cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
+                    # Card not found in Scryfall - log details
+                    context_info = {
+                        "grp_id": grp_id,
+                        "import_session_id": self.import_session.id,
+                        "match_id": match.match_id if match else None,
+                        "deck_id": deck.deck_id if deck else None,
+                        "deck_name": deck.name if deck else None,
+                    }
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Unknown card: grp_id={grp_id}, "
+                            f"deck={deck.name if deck else 'N/A'}, "
+                            f"match={match.match_id[:8] if match else 'N/A'}"
+                        )
+                    )
 
-            Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
+                    # Unknown card placeholder
+                    unknown_card = Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})")
+                    cards_to_create.append(unknown_card)
+                    unknown_cards_to_log.append((grp_id, context_info))
+
+            if cards_to_create:
+                Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
+
+            # Create UnknownCard tracking records
+            if unknown_cards_to_log:
+                unknown_records = []
+                for grp_id, context in unknown_cards_to_log:
+                    card = Card.objects.get(grp_id=grp_id)
+                    unknown_records.append(
+                        UnknownCard(
+                            card=card,
+                            match=match,
+                            deck=deck,
+                            import_session=self.import_session,
+                            raw_data=context,
+                            is_resolved=False,
+                        )
+                    )
+                UnknownCard.objects.bulk_create(unknown_records, ignore_conflicts=True)
+                self.stdout.write(
+                    self.style.WARNING(f"Logged {len(unknown_records)} unknown cards for review")
+                )
 
     def _import_actions(self, match: Match, match_data: MatchData):
         """Import game actions for a match."""

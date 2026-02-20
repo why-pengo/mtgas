@@ -19,5 +19,7 @@ urlpatterns = [
     path("import/", views.import_log, name="import_log"),
     path("imports/", views.import_sessions, name="import_sessions"),
     path("card-data/", views.card_data, name="card_data"),
+    path("unknown-cards/", views.unknown_cards_list, name="unknown_cards_list"),
+    path("unknown-card/<int:grp_id>/fix/", views.unknown_card_fix, name="unknown_card_fix"),
     path("api/stats/", views.api_stats, name="api_stats"),
 ]

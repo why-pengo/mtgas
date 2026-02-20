@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Fix Unknown Card {{ card.grp_id }} - MTG Arena Stats{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Fix Unknown Card</h1>
+        <p class="text-muted">
+            Provide the correct name for this card. This will update all {{ occurrence_count }} occurrence(s).
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Card Details</h5>
+                <dl class="row">
+                    <dt class="col-sm-3">GRP ID:</dt>
+                    <dd class="col-sm-9"><code>{{ card.grp_id }}</code></dd>
+
+                    <dt class="col-sm-3">Current Name:</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge bg-warning text-dark">{{ card.name }}</span>
+                    </dd>
+
+                    <dt class="col-sm-3">Occurrences:</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge bg-secondary">{{ occurrence_count }}</span>
+                    </dd>
+
+                    {% if raw_data_samples %}
+                    <dt class="col-sm-3">Raw Data:</dt>
+                    <dd class="col-sm-9">
+                        <details class="small">
+                            <summary class="text-muted raw-data-summary">
+                                View raw log data ({{ raw_data_samples|length }} sample{{ raw_data_samples|length|pluralize }})
+                            </summary>
+                            <div class="mt-2">
+                                {% for sample in raw_data_samples %}
+                                <pre class="p-2 rounded raw-data-sample"><code>{{ sample }}</code></pre>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </dd>
+                    {% endif %}
+                </dl>
+
+                <h6 class="mt-4">Found In:</h6>
+                <ul class="list-group list-group-flush">
+                    {% for uc in unknown_records|slice:":10" %}
+                    <li class="list-group-item">
+                        {% if uc.deck %}
+                            <strong>Deck:</strong> {{ uc.deck.name }}
+                            {% if uc.deck.format %}
+                                <span class="badge bg-info text-dark">{{ uc.deck.format }}</span>
+                            {% endif %}
+                        {% endif %}
+                        {% if uc.match %}
+                            | <strong>Match:</strong> 
+                            <a href="{% url 'stats:match_detail' uc.match.id %}">
+                                {{ uc.match.match_id|slice:":8" }}...
+                            </a>
+                            {% if uc.match.result %}
+                                <span class="badge {% if uc.match.result == 'Won' %}bg-success{% elif uc.match.result == 'Lost' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {{ uc.match.result }}
+                                </span>
+                            {% endif %}
+                        {% endif %}
+                        <br>
+                        <small class="text-muted">
+                            Import: {{ uc.import_session.started_at|date:"Y-m-d H:i" }}
+                            {% if uc.import_session.log_file %}
+                                | File: {{ uc.import_session.log_file|truncatechars:30 }}
+                            {% endif %}
+                        </small>
+                    </li>
+                    {% endfor %}
+                    {% if occurrence_count > 10 %}
+                    <li class="list-group-item text-muted">
+                        <em>... and {{ occurrence_count|add:"-10" }} more</em>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                <hr class="my-4">
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="card_name" class="form-label">
+                            <strong>Card Name</strong>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="card_name" 
+                               name="card_name" 
+                               value="{{ card.name }}"
+                               placeholder="Enter correct card name"
+                               required
+                               autofocus>
+                        <div class="form-text">
+                            Search for GRP ID {{ card.grp_id }} on:
+                            <a href="https://scryfall.com/search?q=arena%3A{{ card.grp_id }}" target="_blank">Scryfall</a> (arena:{{ card.grp_id }})
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            Update Card Name
+                        </button>
+                        <a href="{% url 'stats:unknown_cards_list' %}" class="btn btn-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6 class="card-title">Tips</h6>
+                <ul class="small">
+                    <li>Check Scryfall using the GRP ID to find the correct name</li>
+                    <li>Use exact spelling including special characters</li>
+                    <li>All occurrences will be updated automatically</li>
+                    <li>This won't affect the Card database; just updates the display name</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

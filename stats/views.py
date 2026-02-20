@@ -35,6 +35,7 @@ from .models import (  # noqa: E402
     ImportSession,
     LifeChange,
     Match,
+    UnknownCard,
     ZoneTransfer,
 )
 
@@ -678,6 +679,9 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     for m in matchups:
         m["win_rate"] = round(m["wins"] / m["games"] * 100, 1) if m["games"] > 0 else 0
 
+    # Count unknown cards in this deck
+    unknown_cards_count = UnknownCard.objects.filter(deck=deck, is_resolved=False).count()
+
     return render(
         request,
         "deck_detail.html",
@@ -688,6 +692,7 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
             "color_counts": color_counts,
             "stats": stats,
             "matchups": matchups,
+            "unknown_cards_count": unknown_cards_count,
         },
     )
 
@@ -846,7 +851,7 @@ def import_log(request: HttpRequest) -> HttpResponse:
 
                 try:
                     logger.info(f"Importing match: {match_id}")
-                    _import_match(match_data, scryfall)
+                    _import_match(match_data, scryfall, session)
                     imported_count += 1
                     logger.debug(f"Successfully imported match: {match_id}")
                 except Exception as e:
@@ -1017,7 +1022,9 @@ def api_stats(request: HttpRequest) -> JsonResponse:
 
 # Helper functions for importing matches
 @transaction.atomic
-def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match:
+def _import_match(
+    match_data: MatchData, scryfall: ScryfallBulkService, import_session: ImportSession
+) -> Match:
     """Import a single match into the database."""
     match_id = match_data.match_id
     logger.debug(f"[{match_id}] Starting import")
@@ -1026,15 +1033,15 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
     deck = None
     if match_data.deck_id:
         logger.debug(f"[{match_id}] Processing deck: {match_data.deck_id}")
-        deck = _ensure_deck(match_data, scryfall)
+        deck = _ensure_deck(match_data, scryfall, import_session)
         logger.debug(f"[{match_id}] Deck ready: {deck.name}")
 
     # Collect all unique card IDs and ensure they're in the cards table
     logger.debug(f"[{match_id}] Collecting card IDs")
     card_grp_ids = _collect_card_ids(match_data)
     logger.debug(f"[{match_id}] Found {len(card_grp_ids)} unique cards")
-    _ensure_cards(card_grp_ids, scryfall)
 
+    # Create Match object first so we can reference it for unknown cards
     # Calculate duration
     duration = None
     if match_data.start_time and match_data.end_time:
@@ -1048,10 +1055,9 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
     if end_time and end_time.tzinfo is None:
         end_time = timezone.make_aware(end_time)
 
-    logger.debug(f"[{match_id}] Creating match record")
-    # Create match
+    # Create Match
     match = Match.objects.create(
-        match_id=match_data.match_id,
+        match_id=match_id,
         game_number=1,
         player_seat_id=match_data.player_seat_id,
         player_name=match_data.player_name,
@@ -1071,7 +1077,10 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
         duration_seconds=duration,
         total_turns=match_data.total_turns,
     )
-    logger.debug(f"[{match_id}] Match created with ID: {match.id}")
+    logger.debug(f"[{match_id}] Match record created: {match.id}")
+
+    # Now ensure cards exist, passing match, deck, and session for unknown card tracking
+    _ensure_cards(card_grp_ids, scryfall, import_session, match, deck)
 
     # Import actions, life changes, zone transfers
     logger.debug(f"[{match_id}] Importing game actions")
@@ -1087,7 +1096,9 @@ def _import_match(match_data: MatchData, scryfall: ScryfallBulkService) -> Match
     return match
 
 
-def _ensure_deck(match_data: MatchData, scryfall: ScryfallBulkService) -> Deck:
+def _ensure_deck(
+    match_data: MatchData, scryfall: ScryfallBulkService, import_session: ImportSession
+) -> Deck:
     """Ensure deck exists in database."""
     deck_id = match_data.deck_id
     logger.debug(f"Looking up deck: {deck_id}")
@@ -1107,7 +1118,8 @@ def _ensure_deck(match_data: MatchData, scryfall: ScryfallBulkService) -> Deck:
             logger.debug(f"Adding {len(match_data.deck_cards)} cards to deck")
             # Ensure cards exist first
             card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
-            _ensure_cards(card_ids, scryfall)
+            # For deck creation, we don't have a match yet, so pass None
+            _ensure_cards(card_ids, scryfall, import_session, None, deck)
 
             # Add deck cards
             cards_added = 0
@@ -1150,7 +1162,13 @@ def _collect_card_ids(match_data: MatchData) -> set[int]:
     return card_ids
 
 
-def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
+def _ensure_cards(
+    card_ids: set[int],
+    scryfall: ScryfallBulkService,
+    import_session: ImportSession,
+    match: Match | None = None,
+    deck: Deck | None = None,
+) -> None:
     """Ensure cards exist in database from Scryfall bulk data."""
     if not card_ids:
         return
@@ -1163,6 +1181,8 @@ def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
         card_lookup = scryfall.lookup_cards_batch(missing_ids)
 
         cards_to_create = []
+        unknown_cards_to_log = []
+
         for grp_id, card_data in card_lookup.items():
             if card_data:
                 cards_to_create.append(
@@ -1184,12 +1204,47 @@ def _ensure_cards(card_ids: set[int], scryfall: ScryfallBulkService) -> None:
                     )
                 )
             else:
-                logger.warning(f"Card {grp_id} not found in Scryfall data")
-                cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
+                # Card not found in Scryfall - log all available info
+                context_info = {
+                    "grp_id": grp_id,
+                    "import_session_id": import_session.id,
+                    "match_id": match.match_id if match else None,
+                    "deck_id": deck.deck_id if deck else None,
+                    "deck_name": deck.name if deck else None,
+                }
+                logger.info(
+                    f"Unknown card discovered - grp_id: {grp_id}, "
+                    f"deck: {deck.name if deck else 'N/A'}, "
+                    f"match: {match.match_id[:8] if match else 'N/A'}"
+                )
+
+                # Create unknown card placeholder
+                unknown_card = Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})")
+                cards_to_create.append(unknown_card)
+                unknown_cards_to_log.append((grp_id, context_info))
 
         if cards_to_create:
             Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
             logger.debug(f"Created {len(cards_to_create)} new card records")
+
+        # Create UnknownCard tracking records for unknown cards
+        if unknown_cards_to_log:
+            unknown_records = []
+            for grp_id, context in unknown_cards_to_log:
+                # Get the Card object we just created
+                card = Card.objects.get(grp_id=grp_id)
+                unknown_records.append(
+                    UnknownCard(
+                        card=card,
+                        match=match,
+                        deck=deck,
+                        import_session=import_session,
+                        raw_data=context,
+                        is_resolved=False,
+                    )
+                )
+            UnknownCard.objects.bulk_create(unknown_records, ignore_conflicts=True)
+            logger.info(f"Logged {len(unknown_records)} unknown cards for manual review")
     else:
         logger.debug(f"All {len(card_ids)} cards already exist in database")
 
@@ -1335,3 +1390,115 @@ def _import_zone_transfers(match: Match, match_data: MatchData) -> None:
         except Exception as e:
             logger.error(f"Error bulk creating zone transfers: {e}", exc_info=True)
             raise
+
+
+def unknown_cards_list(request: HttpRequest) -> HttpResponse:
+    """List all unknown cards discovered during imports."""
+    # Get filter parameters
+    deck_id = request.GET.get("deck_id")
+    session_id = request.GET.get("session_id")
+    show_resolved = request.GET.get("show_resolved", "false") == "true"
+
+    # Base query for unresolved unknown cards
+    unknown_cards = UnknownCard.objects.select_related(
+        "card", "deck", "match", "import_session"
+    ).order_by("-created_at")
+
+    if not show_resolved:
+        unknown_cards = unknown_cards.filter(is_resolved=False)
+
+    if deck_id:
+        unknown_cards = unknown_cards.filter(deck_id=deck_id)
+
+    if session_id:
+        unknown_cards = unknown_cards.filter(import_session_id=session_id)
+
+    unique_unknown = {}
+    for uc in unknown_cards:
+        grp_id = uc.card.grp_id
+        if grp_id not in unique_unknown:
+            unique_unknown[grp_id] = {
+                "card": uc.card,
+                "occurrences": [],
+                "deck_names": set(),
+                "total_count": 0,
+            }
+        unique_unknown[grp_id]["occurrences"].append(uc)
+        unique_unknown[grp_id]["total_count"] += 1
+        if uc.deck:
+            unique_unknown[grp_id]["deck_names"].add(uc.deck.name)
+
+    # Convert to list for template
+    unknown_list = []
+    for data in unique_unknown.values():
+        data["deck_names"] = ", ".join(sorted(data["deck_names"]))
+        unknown_list.append(data)
+
+    # Sort by count (most occurrences first)
+    unknown_list.sort(key=lambda x: x["total_count"], reverse=True)
+
+    # Get counts for display
+    total_unresolved = UnknownCard.objects.filter(is_resolved=False).count()
+    total_resolved = UnknownCard.objects.filter(is_resolved=True).count()
+
+    context = {
+        "unknown_list": unknown_list,
+        "total_unresolved": total_unresolved,
+        "total_resolved": total_resolved,
+        "show_resolved": show_resolved,
+        "deck_filter": deck_id,
+        "session_filter": session_id,
+    }
+
+    return render(request, "unknown_cards_list.html", context)
+
+
+def unknown_card_fix(request: HttpRequest, grp_id: int) -> HttpResponse:
+    """Fix an unknown card by providing its correct name."""
+    card = get_object_or_404(Card, grp_id=grp_id)
+
+    # Get all UnknownCard records for this grp_id
+    unknown_records = UnknownCard.objects.filter(card=card, is_resolved=False).select_related(
+        "deck", "match", "import_session"
+    )
+
+    if request.method == "POST":
+        new_name = request.POST.get("card_name", "").strip()
+
+        if not new_name:
+            messages.error(request, "Card name cannot be empty")
+        else:
+            # Update card name
+            card.name = new_name
+            card.save()
+
+            # Mark all unknown records as resolved
+            count = unknown_records.update(is_resolved=True, resolved_at=timezone.now())
+
+            messages.success(
+                request, f"Updated card {grp_id} to '{new_name}' ({count} occurrences resolved)"
+            )
+            return redirect("stats:unknown_cards_list")
+
+    # Collect unique raw data for debugging
+    raw_data_samples = []
+    seen_data = set()
+    for uc in unknown_records[:10]:  # Limit to first 10 samples
+        if uc.raw_data:
+            # Use JSON string as key for deduplication
+            import json
+
+            data_key = json.dumps(uc.raw_data, sort_keys=True)
+            if data_key not in seen_data:
+                seen_data.add(data_key)
+                # Format JSON for display
+                raw_data_samples.append(json.dumps(uc.raw_data, indent=2, sort_keys=True))
+
+    context = {
+        "card": card,
+        "unknown_records": unknown_records,
+        "occurrence_count": unknown_records.count(),
+        "raw_data_samples": raw_data_samples,
+    }
+
+    return render(request, "unknown_card_fix.html", context)
