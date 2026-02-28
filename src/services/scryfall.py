@@ -208,7 +208,9 @@ class ScryfallBulkService:
             oracle_text = front_face.get("oracle_text", card.get("oracle_text", ""))
             power = front_face.get("power")
             toughness = front_face.get("toughness")
-            image_uri = front_face.get("image_uris", {}).get("normal")
+            image_uri = front_face.get("image_uris", {}).get("normal") or card.get(
+                "image_uris", {}
+            ).get("normal")
         else:
             mana_cost = card.get("mana_cost", "")
             type_line = card.get("type_line", "")
