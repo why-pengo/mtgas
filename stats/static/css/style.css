@@ -467,7 +467,7 @@ html[data-theme="light"] .bg-black {
 }
 
 .raw-data-sample {
-    max-height: 200px;
+    max-height: 400px;
     overflow-y: auto;
     font-size: 0.85rem;
     background-color: #2a2a3a !important;
@@ -476,6 +476,7 @@ html[data-theme="light"] .bg-black {
 
 .raw-data-sample code {
     color: #f0f0f0 !important;
+    white-space: pre;
 }
 
 html[data-theme="light"] .raw-data-sample {
@@ -485,4 +486,78 @@ html[data-theme="light"] .raw-data-sample {
 
 html[data-theme="light"] .raw-data-sample code {
     color: #212529 !important;
+}
+
+/* JSON Syntax Highlighting - Dark Mode */
+.json-key {
+    color: #9cdcfe;
+    font-weight: 500;
+}
+
+.json-string {
+    color: #ce9178;
+}
+
+.json-number {
+    color: #b5cea8;
+}
+
+.json-boolean {
+    color: #569cd6;
+    font-weight: 500;
+}
+
+.json-punctuation {
+    color: #d4d4d4;
+}
+
+/* JSON Syntax Highlighting - Light Mode */
+html[data-theme="light"] .json-key {
+    color: #0451a5;
+    font-weight: 500;
+}
+
+html[data-theme="light"] .json-string {
+    color: #a31515;
+}
+
+html[data-theme="light"] .json-number {
+    color: #098658;
+}
+
+html[data-theme="light"] .json-boolean {
+    color: #0000ff;
+    font-weight: 500;
+}
+
+html[data-theme="light"] .json-punctuation {
+    color: #000000;
+}
+
+/* JSON Collapsible Elements */
+.json-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    width: 14px;
+    margin-left: 4px;
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: #888888;
+}
+
+.json-toggle:hover {
+    color: #ffffff;
+}
+
+html[data-theme="light"] .json-toggle:hover {
+    color: #000000;
+}
+
+.json-toggle.json-collapsed {
+    transform: rotate(-90deg);
+}
+
+.json-collapsible-content.json-collapsed {
+    display: none;
 }

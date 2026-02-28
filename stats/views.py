@@ -1080,7 +1080,7 @@ def _import_match(
     logger.debug(f"[{match_id}] Match record created: {match.id}")
 
     # Now ensure cards exist, passing match, deck, and session for unknown card tracking
-    _ensure_cards(card_grp_ids, scryfall, import_session, match, deck)
+    _ensure_cards(card_grp_ids, scryfall, import_session, match, deck, match_data)
 
     # Import actions, life changes, zone transfers
     logger.debug(f"[{match_id}] Importing game actions")
@@ -1119,7 +1119,7 @@ def _ensure_deck(
             # Ensure cards exist first
             card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
             # For deck creation, we don't have a match yet, so pass None
-            _ensure_cards(card_ids, scryfall, import_session, None, deck)
+            _ensure_cards(card_ids, scryfall, import_session, None, deck, match_data)
 
             # Add deck cards
             cards_added = 0
@@ -1144,7 +1144,7 @@ def _ensure_deck(
 
 
 def _collect_card_ids(match_data: MatchData) -> set[int]:
-    """Collect all unique card IDs from match data."""
+    """Collect all unique card IDs from match data, excluding ability objects."""
     card_ids = set()
 
     for card in match_data.deck_cards:
@@ -1152,6 +1152,9 @@ def _collect_card_ids(match_data: MatchData) -> set[int]:
             card_ids.add(card["cardId"])
 
     for inst_data in match_data.card_instances.values():
+        # Skip ability objects - they're not actual cards
+        if inst_data.get("type") == "GameObjectType_Ability":
+            continue
         if inst_data.get("grp_id"):
             card_ids.add(inst_data["grp_id"])
 
@@ -1168,6 +1171,7 @@ def _ensure_cards(
     import_session: ImportSession,
     match: Match | None = None,
     deck: Deck | None = None,
+    match_data: MatchData | None = None,
 ) -> None:
     """Ensure cards exist in database from Scryfall bulk data."""
     if not card_ids:
@@ -1212,6 +1216,38 @@ def _ensure_cards(
                     "deck_id": deck.deck_id if deck else None,
                     "deck_name": deck.name if deck else None,
                 }
+
+                # Add card instance data from match log if available
+                if match_data and match_data.card_instances:
+                    # Find instances of this card
+                    instances_found = []
+                    for instance_id, card_info in match_data.card_instances.items():
+                        if card_info.get("grp_id") == grp_id:
+                            instances_found.append(
+                                {
+                                    "instance_id": instance_id,
+                                    "name": card_info.get("name"),
+                                    "type": card_info.get("type"),
+                                    "card_types": card_info.get("card_types", []),
+                                    "subtypes": card_info.get("subtypes", []),
+                                    "colors": card_info.get("colors", []),
+                                    "power": card_info.get("power"),
+                                    "toughness": card_info.get("toughness"),
+                                    "owner_seat": card_info.get("owner_seat"),
+                                }
+                            )
+
+                    if instances_found:
+                        context_info["card_instances"] = instances_found
+                        # Use first instance's data for summary
+                        first_instance = instances_found[0]
+                        if first_instance.get("name"):
+                            context_info["arena_name"] = first_instance["name"]
+                        if first_instance.get("type"):
+                            context_info["arena_type"] = first_instance["type"]
+                        if first_instance.get("card_types"):
+                            context_info["arena_card_types"] = first_instance["card_types"]
+
                 logger.info(
                     f"Unknown card discovered - grp_id: {grp_id}, "
                     f"deck: {deck.name if deck else 'N/A'}, "
