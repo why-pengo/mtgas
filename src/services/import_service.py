@@ -212,9 +212,7 @@ class DataImportService:
 
         return deck_db_id
 
-    def _collect_card_ids(
-        self, match: MatchData
-    ) -> Tuple[Set[int], Dict[int, dict]]:
+    def _collect_card_ids(self, match: MatchData) -> Tuple[Set[int], Dict[int, dict]]:
         """Collect card IDs from match data.
 
         Returns:
