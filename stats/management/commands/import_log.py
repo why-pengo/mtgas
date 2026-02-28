@@ -494,6 +494,16 @@ class Command(BaseCommand):
 
     def _import_zone_transfers(self, match: Match, match_data: MatchData):
         """Import zone transfers for a match."""
+        # Pre-validate: only reference card_grp_ids that actually exist in the cards table.
+        # Skipped object types (Ability, TriggerHolder, RevealedCard) are never inserted,
+        # so their grpIds would violate the FK constraint.
+        candidate_ids = {
+            zt.get("card_grp_id") for zt in match_data.zone_transfers if zt.get("card_grp_id")
+        }
+        valid_card_ids = set(
+            Card.objects.filter(grp_id__in=candidate_ids).values_list("grp_id", flat=True)
+        )
+
         seen = set()
         transfers_to_create = []
 
@@ -505,6 +515,8 @@ class Command(BaseCommand):
             seen.add(key)
 
             card_grp_id = zt.get("card_grp_id")
+            if card_grp_id not in valid_card_ids:
+                card_grp_id = None
 
             transfers_to_create.append(
                 ZoneTransfer(

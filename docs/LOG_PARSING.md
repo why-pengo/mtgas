@@ -381,6 +381,20 @@ grpId 95679 → "Sagu Wildling // Roost Seek"
 
 All token/emblem rows in the `cards` table have `is_token=True`, `object_type="GameObjectType_Token"` (or `"GameObjectType_Emblem"`), and `source_grp_id` pointing to the parent card.
 
+### `_import_zone_transfers` — FK pre-validation
+
+`ZoneTransfer.card` is a nullable FK to `cards`. Zone transfers carry a `card_grp_id` sourced from `card_instances`, but skipped object types (`Ability`, `TriggerHolder`, `RevealedCard`) are **never inserted** into the `cards` table. If their grpId appeared on a zone transfer the FK constraint would be violated at transaction commit (SQLite checks deferred FKs on `COMMIT`).
+
+Before the insertion loop, `_import_zone_transfers` runs one pre-validation query:
+
+```python
+candidate_ids  = {zt["card_grp_id"] for zt in zone_transfers if zt.get("card_grp_id")}
+valid_card_ids = set(Card.objects.filter(grp_id__in=candidate_ids).values_list("grp_id", flat=True))
+# Any card_grp_id not in valid_card_ids is set to None before creating the ZoneTransfer row.
+```
+
+The zone transfer is still stored — it just has `card_id=NULL` instead of a dangling reference.
+
 ## Error Handling
 
 The parser implements robust error handling:
