@@ -411,6 +411,8 @@ class MTGALogParser:
                     "toughness": obj.get("toughness", {}).get("value"),
                     "owner_seat": obj.get("ownerSeatId"),
                     "controller_seat": obj.get("controllerSeatId"),
+                    "source_grp_id": obj.get("objectSourceGrpId"),
+                    "zone_id": obj.get("zoneId"),
                 }
 
         # Extract actions
@@ -474,6 +476,26 @@ class MTGALogParser:
                             "from_zone": zone_src,
                             "to_zone": zone_dest,
                             "category": category,
+                        }
+                    )
+
+            elif "AnnotationType_TokenCreated" in ann_type:
+                # Tokens don't have a ZoneTransfer annotation when created — emit a
+                # synthetic zone_transfer so the replay can show the creation event.
+                for inst_id in annotation.get("affectedIds", []):
+                    card_info = self.current_match.card_instances.get(inst_id, {})
+                    grp_id = card_info.get("grp_id")
+                    if not grp_id:
+                        continue
+                    self.current_match.zone_transfers.append(
+                        {
+                            "game_state_id": game_state_id,
+                            "turn_number": turn_number,
+                            "instance_id": inst_id,
+                            "card_grp_id": grp_id,
+                            "from_zone": None,
+                            "to_zone": card_info.get("zone_id"),
+                            "category": "TokenCreated",
                         }
                     )
 

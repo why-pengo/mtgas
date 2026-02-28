@@ -39,7 +39,11 @@ CREATE TABLE IF NOT EXISTS cards (
     toughness TEXT,
     scryfall_id TEXT,
     image_uri TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Token / non-card game object metadata
+    is_token BOOLEAN NOT NULL DEFAULT FALSE,
+    object_type TEXT,                        -- Arena GameObjectType (e.g. GameObjectType_Token)
+    source_grp_id INTEGER                    -- grpId of the card that created this token/emblem
 );
 
 -- Stores information about each match/game

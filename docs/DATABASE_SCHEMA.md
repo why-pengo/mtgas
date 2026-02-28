@@ -9,67 +9,87 @@ The database uses SQLite (via Django ORM) and consists of 7 main tables that tra
 ## Entity Relationship Diagram
 
 ```
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│   cards     │       │    decks    │       │   matches   │
-├─────────────┤       ├─────────────┤       ├─────────────┤
-│ grp_id (PK) │◄──────│ id (PK)     │◄──────│ id (PK)     │
-│ name        │       │ deck_id     │       │ match_id    │
-│ mana_cost   │       │ name        │       │ deck_id(FK) │
-│ cmc         │       │ format      │       │ result      │
-│ type_line   │       │ created_at  │       │ opponent    │
-│ colors      │       └─────────────┘       │ start_time  │
-│ rarity      │              │              │ duration    │
-└─────────────┘              │              └─────────────┘
-       ▲                     ▼                     │
-       │              ┌─────────────┐              │
-       │              │ deck_cards  │              │
-       │              ├─────────────┤              │
-       └──────────────│ deck_id(FK) │              │
-                      │ card_grp_id │              │
-                      │ quantity    │              │
-                      └─────────────┘              │
-                                                  │
-       ┌──────────────────────────────────────────┼──────────────────────┐
-       │                                          │                      │
-       ▼                                          ▼                      ▼
-┌─────────────┐                          ┌─────────────┐         ┌──────────────┐
-│game_actions │                          │life_changes │         │zone_transfers│
-├─────────────┤                          ├─────────────┤         ├──────────────┤
-│ id (PK)     │                          │ id (PK)     │         │ id (PK)      │
-│ match_id(FK)│                          │ match_id(FK)│         │ match_id(FK) │
-│ turn_number │                          │ turn_number │         │ turn_number  │
-│ action_type │                          │ seat_id     │         │ instance_id  │
-│ card_grp_id │                          │ life_total  │         │ card_grp_id  │
-│ mana_cost   │                          │ change_amt  │         │ from_zone    │
-└─────────────┘                          └─────────────┘         │ to_zone      │
-                                                                 └──────────────┘
+┌──────────────────┐       ┌─────────────┐       ┌─────────────┐
+│      cards       │       │    decks    │       │   matches   │
+├──────────────────┤       ├─────────────┤       ├─────────────┤
+│ grp_id (PK)      │◄──────│ id (PK)     │◄──────│ id (PK)     │
+│ name             │       │ deck_id     │       │ match_id    │
+│ mana_cost        │       │ name        │       │ deck_id(FK) │
+│ cmc              │       │ format      │       │ result      │
+│ type_line        │       │ created_at  │       │ opponent    │
+│ colors           │       └─────────────┘       │ start_time  │
+│ rarity           │              │              │ duration    │
+│ is_token         │              │              └─────────────┘
+│ object_type      │              │                     │
+│ source_grp_id    │              ▼                     │
+└──────────────────┘       ┌─────────────┐             │
+        ▲                  │ deck_cards  │             │
+        │                  ├─────────────┤             │
+        └──────────────────│ deck_id(FK) │             │
+                           │ card_grp_id │             │
+                           │ quantity    │             │
+                           └─────────────┘             │
+                                                       │
+        ┌──────────────────────────────────────────────┼──────────────────────┐
+        │                                              │                      │
+        ▼                                              ▼                      ▼
+┌─────────────┐                              ┌─────────────┐         ┌──────────────┐
+│game_actions │                              │life_changes │         │zone_transfers│
+├─────────────┤                              ├─────────────┤         ├──────────────┤
+│ id (PK)     │                              │ id (PK)     │         │ id (PK)      │
+│ match_id(FK)│                              │ match_id(FK)│         │ match_id(FK) │
+│ turn_number │                              │ turn_number │         │ turn_number  │
+│ action_type │                              │ seat_id     │         │ instance_id  │
+│ card_grp_id │                              │ life_total  │         │ card_grp_id  │
+│ mana_cost   │                              │ change_amt  │         │ from_zone    │
+└─────────────┘                              └─────────────┘         │ to_zone      │
+                                                                     │ category     │
+                                                                     └──────────────┘
 ```
 
 ## Tables
 
 ### 1. cards
 
-Stores card metadata from Scryfall bulk data.
+Stores card metadata. Rows are populated from Scryfall bulk data for real MTG cards, and from game-state data for tokens, emblems, and other non-card game objects.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `grp_id` | INTEGER (PK) | MTG Arena's card group ID |
-| `name` | VARCHAR(255) | Card name |
-| `mana_cost` | VARCHAR(100) | Mana cost string (e.g., "{2}{U}{U}") |
+| `name` | VARCHAR(255) | Card name (generated for tokens; e.g. `"1/1 Red Goblin Creature Token"`) |
+| `mana_cost` | VARCHAR(100) | Mana cost string (e.g., `"{2}{U}{U}"`) |
 | `cmc` | FLOAT | Converted mana cost / mana value |
-| `type_line` | VARCHAR(255) | Card type (e.g., "Creature — Human Wizard") |
-| `colors` | JSON | Array of colors ["W", "U", "B", "R", "G"] |
+| `type_line` | VARCHAR(255) | Card type (e.g., `"Creature — Human Wizard"`) |
+| `colors` | JSON | Array of colors `["W", "U", "B", "R", "G"]` |
 | `color_identity` | JSON | Color identity array |
-| `set_code` | VARCHAR(10) | Set code (e.g., "m21") |
-| `rarity` | VARCHAR(20) | common, uncommon, rare, mythic |
+| `set_code` | VARCHAR(10) | Set code (e.g., `"m21"`) |
+| `rarity` | VARCHAR(20) | `common`, `uncommon`, `rare`, `mythic` |
 | `oracle_text` | TEXT | Card rules text |
 | `power` | VARCHAR(10) | Power (for creatures) |
 | `toughness` | VARCHAR(10) | Toughness (for creatures) |
 | `scryfall_id` | VARCHAR(50) | Scryfall UUID |
 | `image_uri` | VARCHAR(500) | URL to card image |
 | `updated_at` | DATETIME | Last update timestamp |
+| `is_token` | BOOLEAN | `True` for tokens and emblems created by card abilities |
+| `object_type` | VARCHAR(50) | Arena `GameObjectType_*` value (e.g. `"GameObjectType_Token"`); `NULL` for real cards |
+| `source_grp_id` | INTEGER | `grp_id` of the card that created this token/emblem; `NULL` for real cards |
 
 **Index:** Primary key on `grp_id`
+
+#### Token and non-card rows
+
+Not all rows in this table represent real MTG cards. The `object_type` column records the Arena game object type for non-card entries:
+
+| `object_type` | `is_token` | How populated |
+|---------------|-----------|---------------|
+| `NULL` | `False` | Real card — name and metadata from Scryfall |
+| `GameObjectType_Token` | `True` | Name generated from game state (power/toughness, color, subtype) |
+| `GameObjectType_Emblem` | `True` | Always stored as `"Emblem"` |
+| `GameObjectType_Adventure` | `False` | Scryfall attempted; `[Adventure] (N)` fallback |
+| `GameObjectType_MDFCBack` | `False` | Scryfall attempted; `[MDFCBack] (N)` fallback |
+| `GameObjectType_RoomLeft/Right` | `False` | Scryfall attempted; `[Room…] (N)` fallback |
+
+System objects (`GameObjectType_TriggerHolder`, `GameObjectType_Ability`, `GameObjectType_RevealedCard`) are **never stored** in this table.
 
 ### 2. decks
 
@@ -193,9 +213,21 @@ Tracks card movements between zones.
 | `turn_number` | INTEGER | Turn number |
 | `instance_id` | INTEGER | Card instance ID |
 | `card_grp_id` | INTEGER (FK) | Reference to cards.grp_id |
-| `from_zone` | VARCHAR(50) | Origin zone (Hand, Library, etc.) |
-| `to_zone` | VARCHAR(50) | Destination zone |
-| `category` | VARCHAR(50) | Transfer type (Draw, CastSpell, etc.) |
+| `from_zone` | VARCHAR(50) | Origin zone integer ID (`NULL` for token creation events) |
+| `to_zone` | VARCHAR(50) | Destination zone integer ID |
+| `category` | VARCHAR(50) | Transfer type — see below |
+
+**`category` values:**
+
+| Value | Source | Description |
+|-------|--------|-------------|
+| `CastSpell` | Arena log | Spell cast from hand |
+| `Draw` | Arena log | Card drawn from library |
+| `PlayLand` | Arena log | Land played from hand |
+| `TokenCreated` | **Synthetic** | Token/emblem created by a card ability; `from_zone` is `NULL` |
+| *(others)* | Arena log | Other zone-transfer categories emitted by MTGA |
+
+Rows with `category = "TokenCreated"` are **synthetic** — they are generated by the parser from `AnnotationType_TokenCreated` annotations (which carry no zone information) using the token's zone from `card_instances`. They give the match timeline and replay a concrete event for token creation.
 
 ### 8. import_sessions
 
@@ -256,5 +288,17 @@ WHERE ga.action_type = 'ActionType_Cast'
 GROUP BY c.grp_id
 ORDER BY times_played DESC
 LIMIT 20;
+```
+
+### Tokens Created in a Match
+```sql
+SELECT c.name as token_name, c.source_grp_id, src.name as created_by,
+       zt.turn_number
+FROM zone_transfers zt
+JOIN cards c ON zt.card_grp_id = c.grp_id
+LEFT JOIN cards src ON c.source_grp_id = src.grp_id
+WHERE zt.category = 'TokenCreated'
+  AND zt.match_id = ?
+ORDER BY zt.turn_number;
 ```
 

@@ -225,11 +225,12 @@ Extracted from `turnInfo` in game state messages:
 
 ### Card Objects
 
-Game objects contain card information:
+Game objects contain card information. Every `gameObjects` entry is stored in `card_instances`, keyed by `instanceId`:
+
 ```python
 {
-    "instanceId": 100,      # Unique ID for this game
-    "grpId": 12345,         # Card type ID (maps to Scryfall)
+    "instanceId": 100,          # Unique ID for this game
+    "grpId": 12345,             # Card type ID (maps to Scryfall)
     "type": "GameObjectType_Card",
     "cardTypes": ["CardType_Creature"],
     "subtypes": ["SubType_Human", "SubType_Wizard"],
@@ -237,9 +238,30 @@ Game objects contain card information:
     "power": {"value": 2},
     "toughness": {"value": 1},
     "ownerSeatId": 2,
-    "controllerSeatId": 2
+    "controllerSeatId": 2,
+    "objectSourceGrpId": null,  # grpId of the card that created this object (tokens)
+    "zoneId": 28                # Zone the object currently occupies
 }
 ```
+
+#### Arena Game Object Types
+
+Not all game objects are real MTG cards. The `type` field determines how the object is handled:
+
+| `type` | Description | Card DB treatment |
+|--------|-------------|-------------------|
+| `GameObjectType_Card` | A real MTG card | Looked up in Scryfall; `Unknown Card (N)` fallback |
+| `GameObjectType_Token` | Token created by a card ability | Name generated from game state (e.g. `"1/1 Red Goblin Creature Token"`); stored with `is_token=True` |
+| `GameObjectType_Emblem` | Planeswalker emblem | Stored as `"Emblem"` with `is_token=True` |
+| `GameObjectType_Adventure` | Adventure half of an adventure card | Scryfall lookup attempted; `[Adventure] (N)` fallback |
+| `GameObjectType_MDFCBack` | Back face of a modal double-faced card | Scryfall lookup attempted; `[MDFCBack] (N)` fallback |
+| `GameObjectType_RoomLeft/Right` | Room half of a Room card | Scryfall lookup attempted; `[Room…] (N)` fallback |
+| `GameObjectType_Omen` | Omen card | Scryfall lookup attempted |
+| `GameObjectType_TriggerHolder` | Internal engine trigger object | **Skipped entirely** — not stored in the cards table |
+| `GameObjectType_Ability` | Activated/triggered ability on the stack | **Skipped entirely** |
+| `GameObjectType_RevealedCard` | Revealed card from an effect | **Skipped entirely** |
+
+The `objectSourceGrpId` field (stored as `source_grp_id` in the `cards` table) links a token or emblem back to the card that created it.
 
 ### Actions
 
@@ -269,7 +291,7 @@ Player actions are captured with details:
 
 ### Zone Transfers
 
-Card movements between zones (from annotations):
+Card movements between zones (from `AnnotationType_ZoneTransfer` annotations):
 ```python
 {
     "type": ["AnnotationType_ZoneTransfer"],
@@ -284,6 +306,44 @@ Card movements between zones (from annotations):
 
 **Zone Types:**
 - Library, Hand, Battlefield, Graveyard, Exile, Stack, etc.
+
+### Token Creation
+
+When a card ability creates a token, MTGA emits `AnnotationType_TokenCreated` instead of a zone transfer:
+
+```python
+{
+    "type": ["AnnotationType_TokenCreated"],
+    "affectorId": 301,    # ability/spell that created the token
+    "affectedIds": [302]  # instanceId of the new token
+}
+```
+
+This annotation has no `zone_src`/`zone_dest` details. The parser handles it by:
+1. Looking up the token's `zoneId` from `card_instances` (populated when game objects are processed earlier in the same game state message).
+2. Emitting a **synthetic zone_transfer** with `from_zone=None`, `to_zone=<token's zoneId>`, and `category="TokenCreated"`.
+
+This synthetic record flows through the import service and is stored in the `zone_transfers` table with `category="TokenCreated"`, making token creation events visible in the match timeline and replay.
+
+## Import Service: Card Classification
+
+When a match is imported, `_collect_card_ids()` separates game object IDs into two buckets:
+
+- **`real_card_ids`** — `GameObjectType_Card`, deck card IDs, and unrecognised types → looked up in Scryfall.
+- **`special_objects`** — tokens, emblems, adventure faces, MDFC backs, room halves → handled without Scryfall.
+
+Skipped object types (`GameObjectType_TriggerHolder`, `GameObjectType_Ability`, `GameObjectType_RevealedCard`) are never added to either set.
+
+For tokens and emblems, `_generate_token_name()` builds a name from the game state data:
+
+```
+power/toughness  colors  subtypes  card_types  "Token"
+→ "1/1 Red Goblin Creature Token"
+→ "Treasure Artifact Token"
+→ "Emblem"
+```
+
+All token/emblem rows in the `cards` table have `is_token=True` and `object_type="GameObjectType_Token"` (or `"GameObjectType_Emblem"`). The `source_grp_id` column stores the `grpId` of the parent card.
 
 ## Error Handling
 

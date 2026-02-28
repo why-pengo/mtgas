@@ -226,6 +226,20 @@ def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
             current_life[seat] = life
             life_idx += 1
 
+        # Token creation events use a synthetic category rather than zone labels
+        if zt.category == "TokenCreated":
+            timeline.append(
+                {
+                    "turn": zt.turn_number or 0,
+                    "actor": None,
+                    "verb": "token created",
+                    "card": zt.card,
+                    "life_you": current_life.get(match.player_seat_id, 20),
+                    "life_opp": current_life.get(match.opponent_seat_id, 20),
+                }
+            )
+            continue
+
         fz = str(zt.from_zone) if zt.from_zone is not None else ""
         tz = str(zt.to_zone) if zt.to_zone is not None else ""
         from_label = zone_labels.get(fz, f"Zone {fz}")
@@ -539,6 +553,31 @@ def match_replay(request: HttpRequest, match_id: int) -> HttpResponse:
             current_life[seat] = life
             life_idx += 1
 
+        card = zt.card
+        card_name = card.name if card else None
+        card_image = f"/static/card_images/{card.grp_id}.jpg" if card else None
+        card_fallback = card.image_uri if card else None
+
+        # Token creation events use a synthetic category rather than zone labels
+        if zt.category == "TokenCreated":
+            description = f"Token created: {card_name}" if card_name else "Token created"
+            steps.append(
+                {
+                    "turn": zt.turn_number,
+                    "phase": "",
+                    "actor": "—",
+                    "action": "token created",
+                    "card_name": card_name,
+                    "card_image": card_image,
+                    "card_fallback": card_fallback or "",
+                    "life_you": current_life.get(match.player_seat_id, 20),
+                    "life_opp": current_life.get(match.opponent_seat_id, 20),
+                    "description": description,
+                    "is_token": True,
+                }
+            )
+            continue
+
         fz = str(zt.from_zone) if zt.from_zone is not None else ""
         tz = str(zt.to_zone) if zt.to_zone is not None else ""
         from_label = zone_labels.get(fz, f"Zone {fz}")
@@ -557,11 +596,6 @@ def match_replay(request: HttpRequest, match_id: int) -> HttpResponse:
         if verb is None:
             continue  # skip this transfer
 
-        card = zt.card
-        card_name = card.name if card else None
-        card_image = f"/static/card_images/{card.grp_id}.jpg" if card else None
-        card_fallback = card.image_uri if card else None
-
         if actor == "—":
             description = f"{verb}: {card_name}" if card_name else verb
         else:
@@ -579,6 +613,7 @@ def match_replay(request: HttpRequest, match_id: int) -> HttpResponse:
                 "life_you": current_life.get(match.player_seat_id, 20),
                 "life_opp": current_life.get(match.opponent_seat_id, 20),
                 "description": description,
+                "is_token": card.is_token if card else False,
             }
         )
 

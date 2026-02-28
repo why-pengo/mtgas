@@ -73,9 +73,41 @@ Actor rules applied per transfer:
 
 ---
 
+## Token Events
+
+### Token Creation
+
+Token creation (`AnnotationType_TokenCreated`) is **not** a `ZoneTransfer` annotation in the raw log — it has no `zone_src` / `zone_dest` details. To make token creation visible in the replay, the parser emits a **synthetic zone_transfer** with `category="TokenCreated"` for each created token (see `LOG_PARSING.md` → *Token Creation*).
+
+The replay and timeline views detect this category before applying the normal zone-label/verb pipeline:
+
+```python
+if zt.category == "TokenCreated":
+    verb = "token created"
+    # skip zone label lookup entirely
+```
+
+This ensures token creation always appears as a distinct step even when the token's zone has not been mapped by `_build_zone_labels()`.
+
+### Visual Badge
+
+Any step where `card.is_token` is `True` renders a gold **TOKEN** badge next to the card name in both the match timeline and the step-through replay UI. Token creation steps use the format:
+
+```
+[TOKEN] 1/1 Red Goblin Creature Token — token created
+```
+
+Regular token moves (e.g. a token dying) use the standard format with the badge prepended:
+
+```
+[TOKEN] 1/1 Red Goblin Creature Token — died
+```
+
+---
+
 ## Event Verbs
 
-The `_zone_verb()` function maps `(from_role, to_role)` pairs to human-readable descriptions, or returns `None` to skip the event entirely.
+The `_zone_verb()` function maps `(from_role, to_role)` pairs to human-readable descriptions, or returns `None` to skip the event entirely. Token creation bypasses this function (see *Token Events* above).
 
 | From → To | Verb | Notes |
 |-----------|------|-------|
@@ -105,7 +137,7 @@ Both the player's and opponent's life changes are captured by the parser and sto
 ## Data Limitations
 
 - **`turn_number = 0`** on some events: Resolved by the parser now tracking the last-seen turn number and applying it to subsequent messages that lack `turnInfo`. Opening-hand reveals and similar pre-game transfers may still show turn 0 as expected.
-- **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as "Unknown Card (grp_id)". Run `make download-cards` to populate the cache.
+- **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as `"Unknown Card (N)"`. Run `make download-cards` to populate the cache. Note that tokens and other non-card game objects are **not** looked up in Scryfall — they are stored with generated names (see *Import Service: Card Classification* above).
 - **Opponent's cards**: Cards played from the opponent's hand only become known when they enter the battlefield. Prior to that they appear as anonymous transfers.
 
 ---
@@ -116,7 +148,11 @@ Both the player's and opponent's life changes are captured by the parser and sto
 |----------|---------|
 | `stats/views.py` — `_build_zone_labels()` | Infers zone roles from transfer statistics |
 | `stats/views.py` — `_zone_verb()` | Maps zone-pair transitions to event verbs |
-| `stats/views.py` — `match_replay()` | View: builds step list, serialises to JSON |
-| `stats/templates/match_replay.html` | Template: JS step-through UI |
-| `src/parser/log_parser.py` — `_process_game_state_message()` | Parser: extracts `AnnotationType_ZoneTransfer` from log |
-| `stats/models.py` — `ZoneTransfer` | ORM model for zone transfer records |
+| `stats/views.py` — `match_replay()` | View: builds step list, serialises to JSON; handles `TokenCreated` category |
+| `stats/views.py` — `match_detail()` | Timeline view; handles `TokenCreated` category |
+| `stats/templates/match_replay.html` | Template: JS step-through UI with TOKEN badge |
+| `src/parser/log_parser.py` — `_process_game_state_message()` | Parser: extracts `AnnotationType_ZoneTransfer`; emits synthetic entries for `AnnotationType_TokenCreated` |
+| `stats/models.py` — `ZoneTransfer` | ORM model for zone transfer records (`category` field carries `"TokenCreated"` for synthetic entries) |
+| `stats/models.py` — `Card` | `is_token`, `object_type`, `source_grp_id` fields identify token/non-card game objects |
+| `src/services/import_service.py` — `_collect_card_ids()` | Splits game object IDs into real cards vs. special objects (tokens, faces, system objects) |
+| `src/services/import_service.py` — `_generate_token_name()` | Builds human-readable token names from game-state data |

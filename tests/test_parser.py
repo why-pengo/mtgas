@@ -311,3 +311,128 @@ Another non-JSON line {broken
 
         # Should only have one match despite multiple state events
         assert len(matches) == 1
+
+
+class TestTokenNameGeneration:
+    """Tests for the _generate_token_name helper in DataImportService."""
+
+    def _make_service(self):
+        from unittest.mock import MagicMock
+
+        from src.services.import_service import DataImportService
+
+        svc = DataImportService.__new__(DataImportService)
+        svc.db = MagicMock()
+        svc.scryfall = MagicMock()
+        return svc
+
+    def test_creature_token_with_pt_color_subtype(self):
+        svc = self._make_service()
+        inst = {
+            "type": "GameObjectType_Token",
+            "power": 1,
+            "toughness": 1,
+            "colors": ["CardColor_Red"],
+            "subtypes": ["SubType_Goblin"],
+            "card_types": ["CardType_Creature"],
+        }
+        assert svc._generate_token_name(inst) == "1/1 Red Goblin Creature Token"
+
+    def test_artifact_token_no_pt(self):
+        svc = self._make_service()
+        inst = {
+            "type": "GameObjectType_Token",
+            "power": None,
+            "toughness": None,
+            "colors": [],
+            "subtypes": ["SubType_Treasure"],
+            "card_types": ["CardType_Artifact"],
+        }
+        assert svc._generate_token_name(inst) == "Treasure Artifact Token"
+
+    def test_emblem_token(self):
+        svc = self._make_service()
+        inst = {"type": "GameObjectType_Emblem"}
+        assert svc._generate_token_name(inst) == "Emblem"
+
+    def test_colorless_token(self):
+        svc = self._make_service()
+        inst = {
+            "type": "GameObjectType_Token",
+            "power": 2,
+            "toughness": 2,
+            "colors": [],
+            "subtypes": ["SubType_Lander"],
+            "card_types": ["CardType_Artifact"],
+        }
+        assert svc._generate_token_name(inst) == "2/2 Lander Artifact Token"
+
+
+class TestCollectCardIds:
+    """Tests for the _collect_card_ids split between real cards and special objects."""
+
+    def _make_service(self):
+        from unittest.mock import MagicMock
+
+        from src.services.import_service import DataImportService
+
+        svc = DataImportService.__new__(DataImportService)
+        svc.db = MagicMock()
+        svc.scryfall = MagicMock()
+        return svc
+
+    def test_tokens_go_to_special_objects(self):
+        from src.parser.log_parser import MatchData
+
+        svc = self._make_service()
+        match = MatchData(match_id="test")
+        match.card_instances[1] = {
+            "grp_id": 9999,
+            "type": "GameObjectType_Token",
+            "source_grp_id": 1234,
+            "power": 1,
+            "toughness": 1,
+            "colors": ["CardColor_Green"],
+            "subtypes": ["SubType_Elf"],
+            "card_types": ["CardType_Creature"],
+        }
+        real_ids, special = svc._collect_card_ids(match)
+        assert 9999 not in real_ids
+        assert 9999 in special
+
+    def test_real_card_not_in_special(self):
+        from src.parser.log_parser import MatchData
+
+        svc = self._make_service()
+        match = MatchData(match_id="test")
+        match.card_instances[1] = {
+            "grp_id": 8888,
+            "type": "GameObjectType_Card",
+            "source_grp_id": None,
+        }
+        real_ids, special = svc._collect_card_ids(match)
+        assert 8888 in real_ids
+        assert 8888 not in special
+
+    def test_trigger_holder_skipped_entirely(self):
+        from src.parser.log_parser import MatchData
+
+        svc = self._make_service()
+        match = MatchData(match_id="test")
+        match.card_instances[1] = {
+            "grp_id": 5,
+            "type": "GameObjectType_TriggerHolder",
+            "source_grp_id": None,
+        }
+        real_ids, special = svc._collect_card_ids(match)
+        assert 5 not in real_ids
+        assert 5 not in special
+
+    def test_deck_cards_always_real(self):
+        from src.parser.log_parser import MatchData
+
+        svc = self._make_service()
+        match = MatchData(match_id="test")
+        match.deck_cards = [{"cardId": 7777, "quantity": 4}]
+        real_ids, special = svc._collect_card_ids(match)
+        assert 7777 in real_ids

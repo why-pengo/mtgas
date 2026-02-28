@@ -26,6 +26,23 @@ class Card(models.Model):
     image_uri = models.URLField(max_length=500, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Token / non-card game object metadata
+    is_token = models.BooleanField(
+        default=False,
+        help_text="True for tokens and emblems created by card abilities",
+    )
+    object_type = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Arena game object type (e.g. GameObjectType_Token)",
+    )
+    source_grp_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="grpId of the card that created this token/emblem",
+    )
+
     class Meta:
         db_table = "cards"
         verbose_name_plural = "Cards"

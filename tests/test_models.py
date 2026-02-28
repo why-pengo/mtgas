@@ -98,6 +98,33 @@ class TestCardModel:
         card.refresh_from_db()
         assert card.colors == ["W", "U", "B"]
 
+    def test_token_card_fields(self):
+        """Test that token cards can be stored with is_token metadata."""
+        from stats.models import Card
+
+        token = Card.objects.create(
+            grp_id=55555,
+            name="1/1 Red Goblin Creature Token",
+            is_token=True,
+            object_type="GameObjectType_Token",
+            source_grp_id=12345,
+        )
+
+        token.refresh_from_db()
+        assert token.is_token is True
+        assert token.object_type == "GameObjectType_Token"
+        assert token.source_grp_id == 12345
+        assert str(token) == "1/1 Red Goblin Creature Token"
+
+    def test_card_is_token_defaults_false(self):
+        """Non-token cards default to is_token=False."""
+        from stats.models import Card
+
+        card = Card.objects.create(grp_id=66666, name="Lightning Bolt")
+        assert card.is_token is False
+        assert card.object_type is None
+        assert card.source_grp_id is None
+
 
 @pytest.mark.django_db
 class TestDeckModel:

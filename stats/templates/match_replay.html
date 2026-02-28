@@ -63,6 +63,20 @@
 
     .replay-actor-you { color: #64b5f6; }
     .replay-actor-opp { color: #ffb74d; }
+    .replay-token-badge {
+        display: inline-block;
+        font-size: 0.7em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: #4a3b00;
+        color: #ffd54f;
+        border: 1px solid #ffd54f;
+        border-radius: 3px;
+        padding: 1px 5px;
+        margin-right: 4px;
+        vertical-align: middle;
+    }
 
     .life-totals {
         display: flex;
@@ -234,9 +248,18 @@
 
         // Description with actor colour
         const actorClass = s.actor === "You" ? "replay-actor-you" : "replay-actor-opp";
-        descEl.innerHTML =
-            `<span class="${actorClass}">${s.actor}</span> — ${s.action}` +
-            (s.card_name ? `: <strong>${s.card_name}</strong>` : "");
+        const tokenBadge = s.is_token ? '<span class="replay-token-badge">Token</span>' : "";
+        if (s.is_token && s.actor === "—") {
+            descEl.innerHTML =
+                tokenBadge +
+                (s.card_name ? `<strong>${s.card_name}</strong>` : "") +
+                ` — ${s.action}`;
+        } else {
+            descEl.innerHTML =
+                tokenBadge +
+                `<span class="${actorClass}">${s.actor}</span> — ${s.action}` +
+                (s.card_name ? `: <strong>${s.card_name}</strong>` : "");
+        }
 
         // Life totals
         lifeYou.textContent = s.life_you;

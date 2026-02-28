@@ -6,13 +6,48 @@ Coordinates log parsing, card lookup, and database storage.
 
 import json
 import logging
-from typing import Optional, Set
+from typing import Dict, Optional, Set, Tuple
 
 from ..db.database import DatabaseManager, get_db, init_db
 from ..parser.log_parser import MatchData, parse_log_file
-from .scryfall import ScryfallService, get_scryfall
+from .scryfall import ScryfallBulkService, get_scryfall
 
 logger = logging.getLogger(__name__)
+
+# GameObjectTypes that are purely internal engine state — never look up in Scryfall.
+_SKIP_OBJECT_TYPES = frozenset(
+    {
+        "GameObjectType_TriggerHolder",
+        "GameObjectType_Ability",
+        "GameObjectType_RevealedCard",
+    }
+)
+
+# GameObjectTypes that are tokens/emblems created by card abilities.
+# They don't exist in Scryfall; we build their name from game-state data.
+_TOKEN_OBJECT_TYPES = frozenset(
+    {
+        "GameObjectType_Token",
+        "GameObjectType_Emblem",
+    }
+)
+
+_COLOR_LABELS: Dict[str, str] = {
+    "CardColor_White": "White",
+    "CardColor_Blue": "Blue",
+    "CardColor_Black": "Black",
+    "CardColor_Red": "Red",
+    "CardColor_Green": "Green",
+}
+_CARD_TYPE_LABELS: Dict[str, str] = {
+    "CardType_Creature": "Creature",
+    "CardType_Artifact": "Artifact",
+    "CardType_Enchantment": "Enchantment",
+    "CardType_Land": "Land",
+    "CardType_Planeswalker": "Planeswalker",
+    "CardType_Instant": "Instant",
+    "CardType_Sorcery": "Sorcery",
+}
 
 
 class DataImportService:
@@ -21,7 +56,7 @@ class DataImportService:
     """
 
     def __init__(
-        self, db: Optional[DatabaseManager] = None, scryfall: Optional[ScryfallService] = None
+        self, db: Optional[DatabaseManager] = None, scryfall: Optional[ScryfallBulkService] = None
     ):
         """
         Initialize the import service.
@@ -84,8 +119,8 @@ class DataImportService:
             deck_db_id = self._ensure_deck(match)
 
         # Collect all unique card IDs and ensure they're in the cards table
-        card_grp_ids = self._collect_card_ids(match)
-        self._ensure_cards(card_grp_ids)
+        card_grp_ids, special_objects = self._collect_card_ids(match)
+        self._ensure_cards(card_grp_ids, special_objects)
 
         # Calculate duration
         duration = None
@@ -177,55 +212,173 @@ class DataImportService:
 
         return deck_db_id
 
-    def _collect_card_ids(self, match: MatchData) -> Set[int]:
-        """Collect all unique card IDs from match data."""
-        card_ids = set()
+    def _collect_card_ids(
+        self, match: MatchData
+    ) -> Tuple[Set[int], Dict[int, dict]]:
+        """Collect card IDs from match data.
 
-        # From deck
+        Returns:
+            real_card_ids: grpIds that should be looked up in Scryfall
+                (GameObjectType_Card, deck cards, or unrecognised types).
+            special_objects: grpId → instance_data for tokens, emblems, and
+                named card-face types (Adventure, MDFCBack, etc.) that may or
+                may not be in Scryfall.
+        """
+        real_card_ids: Set[int] = set()
+        special_objects: Dict[int, dict] = {}
+
+        # Deck cards are always real cards
         for card in match.deck_cards:
             if card.get("cardId"):
-                card_ids.add(card["cardId"])
+                real_card_ids.add(card["cardId"])
 
-        # From card instances
+        # Categorise each card instance by its Arena object type
         for inst_data in match.card_instances.values():
-            if inst_data.get("grp_id"):
-                card_ids.add(inst_data["grp_id"])
+            grp_id = inst_data.get("grp_id")
+            obj_type = inst_data.get("type", "")
+            if not grp_id:
+                continue
+            if obj_type in _SKIP_OBJECT_TYPES:
+                continue  # Engine-only objects — ignore entirely
+            if obj_type == "GameObjectType_Card":
+                # Confirmed real card; remove from special_objects if seen earlier
+                real_card_ids.add(grp_id)
+                special_objects.pop(grp_id, None)
+            elif grp_id not in real_card_ids:
+                # Token, emblem, adventure face, MDFC back, etc.
+                # First occurrence wins; real-card sighting takes priority above.
+                special_objects.setdefault(grp_id, inst_data)
 
-        # From actions
+        # Actions may reference grpIds not captured as card instances
         for action in match.actions:
-            if action.get("card_grp_id"):
-                card_ids.add(action["card_grp_id"])
+            cid = action.get("card_grp_id")
+            if cid and cid not in special_objects:
+                real_card_ids.add(cid)
 
-        return card_ids
+        return real_card_ids, special_objects
 
-    def _ensure_cards(self, card_ids: Set[int]):
-        """Ensure cards exist in database, looking up from Scryfall if needed."""
-        if not card_ids:
+    @staticmethod
+    def _generate_token_name(inst_data: dict) -> str:
+        """Build a human-readable name for a token from its game-state data.
+
+        Example outputs:
+            "1/1 Red Goblin Creature Token"
+            "Lander Artifact Token"
+            "Emblem"
+        """
+        if inst_data.get("type") == "GameObjectType_Emblem":
+            return "Emblem"
+
+        parts = []
+        power = inst_data.get("power")
+        toughness = inst_data.get("toughness")
+        if power is not None and toughness is not None:
+            parts.append(f"{power}/{toughness}")
+
+        colors = [_COLOR_LABELS.get(c, c) for c in (inst_data.get("colors") or [])]
+        parts.extend(colors)
+
+        subtypes = [s.replace("SubType_", "") for s in (inst_data.get("subtypes") or [])]
+        card_types = [
+            _CARD_TYPE_LABELS.get(t, t.replace("CardType_", ""))
+            for t in (inst_data.get("card_types") or [])
+        ]
+        parts.extend(subtypes)
+        parts.extend(card_types)
+        parts.append("Token")
+        return " ".join(parts)
+
+    def _ensure_cards(self, real_card_ids: Set[int], special_objects: Dict[int, dict]):
+        """Ensure all referenced cards/objects exist in the database.
+
+        * real_card_ids: looked up in Scryfall; fall back to "Unknown Card (N)".
+        * special_objects: tokens/emblems get a generated name; other face types
+          try Scryfall first and use a descriptive placeholder on failure.
+        """
+        all_ids = real_card_ids | set(special_objects)
+        if not all_ids:
             return
 
-        # Check which cards we already have
-        placeholders = ",".join("?" * len(card_ids))
+        placeholders = ",".join("?" * len(all_ids))
         cursor = self.db.execute(
-            f"SELECT grp_id FROM cards WHERE grp_id IN ({placeholders})", tuple(card_ids)
+            f"SELECT grp_id FROM cards WHERE grp_id IN ({placeholders})", tuple(all_ids)
         )
         existing_ids = {row["grp_id"] for row in cursor.fetchall()}
 
-        # Look up missing cards
-        missing_ids = card_ids - existing_ids
-        if missing_ids:
-            logger.info(f"Looking up {len(missing_ids)} new cards from Scryfall...")
+        missing_real = real_card_ids - existing_ids
+        missing_special = {gid: d for gid, d in special_objects.items() if gid not in existing_ids}
 
-            for grp_id in missing_ids:
+        if missing_real or missing_special:
+            logger.info(
+                f"Looking up {len(missing_real)} cards from Scryfall, "
+                f"processing {len(missing_special)} special objects..."
+            )
+
+        # ── Real cards: look up Scryfall, fall back to Unknown placeholder ──
+        for grp_id in missing_real:
+            card_data = self.scryfall.get_card_by_arena_id(grp_id)
+            if card_data:
+                self.db.execute(
+                    """
+                    INSERT OR REPLACE INTO cards (
+                        grp_id, name, mana_cost, cmc, type_line,
+                        colors, color_identity, set_code, rarity,
+                        oracle_text, power, toughness, scryfall_id, image_uri
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        grp_id,
+                        card_data.get("name"),
+                        card_data.get("mana_cost"),
+                        card_data.get("cmc"),
+                        card_data.get("type_line"),
+                        json.dumps(card_data.get("colors", [])),
+                        json.dumps(card_data.get("color_identity", [])),
+                        card_data.get("set_code"),
+                        card_data.get("rarity"),
+                        card_data.get("oracle_text"),
+                        card_data.get("power"),
+                        card_data.get("toughness"),
+                        card_data.get("scryfall_id"),
+                        card_data.get("image_uri"),
+                    ),
+                )
+            else:
+                logger.debug(f"Card grp_id={grp_id} not found in Scryfall")
+                self.db.execute(
+                    "INSERT OR IGNORE INTO cards (grp_id, name) VALUES (?, ?)",
+                    (grp_id, f"Unknown Card ({grp_id})"),
+                )
+
+        # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
+        for grp_id, inst_data in missing_special.items():
+            obj_type = inst_data.get("type", "")
+            source_grp_id = inst_data.get("source_grp_id")
+
+            if obj_type in _TOKEN_OBJECT_TYPES:
+                name = self._generate_token_name(inst_data)
+                logger.debug(f"Inserting token grp_id={grp_id} as '{name}'")
+                self.db.execute(
+                    """
+                    INSERT OR IGNORE INTO cards (
+                        grp_id, name, is_token, object_type, source_grp_id
+                    ) VALUES (?, ?, 1, ?, ?)
+                """,
+                    (grp_id, name, obj_type, source_grp_id),
+                )
+            else:
+                # Adventure face, MDFC back, Room half, Omen, etc.
+                # Try Scryfall first (some face types have Arena IDs in bulk data).
                 card_data = self.scryfall.get_card_by_arena_id(grp_id)
-
                 if card_data:
                     self.db.execute(
                         """
                         INSERT OR REPLACE INTO cards (
                             grp_id, name, mana_cost, cmc, type_line,
                             colors, color_identity, set_code, rarity,
-                            oracle_text, power, toughness, scryfall_id, image_uri
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            oracle_text, power, toughness, scryfall_id, image_uri,
+                            object_type
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             grp_id,
@@ -242,16 +395,20 @@ class DataImportService:
                             card_data.get("toughness"),
                             card_data.get("scryfall_id"),
                             card_data.get("image_uri"),
+                            obj_type,
                         ),
                     )
                 else:
-                    # Insert placeholder for unknown cards
+                    # Friendly placeholder showing the object type
+                    label = obj_type.replace("GameObjectType_", "") if obj_type else "Unknown"
+                    logger.debug(f"Inserting {label} placeholder grp_id={grp_id}")
                     self.db.execute(
                         """
-                        INSERT OR IGNORE INTO cards (grp_id, name)
-                        VALUES (?, ?)
+                        INSERT OR IGNORE INTO cards (
+                            grp_id, name, object_type, source_grp_id
+                        ) VALUES (?, ?, ?, ?)
                     """,
-                        (grp_id, f"Unknown Card ({grp_id})"),
+                        (grp_id, f"[{label}] ({grp_id})", obj_type, source_grp_id),
                     )
 
     def _import_actions(self, match_db_id: int, match: MatchData):
