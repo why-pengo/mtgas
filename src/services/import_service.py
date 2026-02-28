@@ -50,6 +50,37 @@ _CARD_TYPE_LABELS: Dict[str, str] = {
 }
 
 
+def generate_token_name(inst_data: dict) -> str:
+    """Build a human-readable name for a token from its game-state data.
+
+    Example outputs:
+        "1/1 Red Goblin Creature Token"
+        "Lander Artifact Token"
+        "Emblem"
+    """
+    if inst_data.get("type") == "GameObjectType_Emblem":
+        return "Emblem"
+
+    parts = []
+    power = inst_data.get("power")
+    toughness = inst_data.get("toughness")
+    if power is not None and toughness is not None:
+        parts.append(f"{power}/{toughness}")
+
+    colors = [_COLOR_LABELS.get(c, c) for c in (inst_data.get("colors") or [])]
+    parts.extend(colors)
+
+    subtypes = [s.replace("SubType_", "") for s in (inst_data.get("subtypes") or [])]
+    card_types = [
+        _CARD_TYPE_LABELS.get(t, t.replace("CardType_", ""))
+        for t in (inst_data.get("card_types") or [])
+    ]
+    parts.extend(subtypes)
+    parts.extend(card_types)
+    parts.append("Token")
+    return " ".join(parts)
+
+
 class DataImportService:
     """
     Service for importing MTG Arena log data into the database.
@@ -255,36 +286,8 @@ class DataImportService:
 
         return real_card_ids, special_objects
 
-    @staticmethod
-    def _generate_token_name(inst_data: dict) -> str:
-        """Build a human-readable name for a token from its game-state data.
-
-        Example outputs:
-            "1/1 Red Goblin Creature Token"
-            "Lander Artifact Token"
-            "Emblem"
-        """
-        if inst_data.get("type") == "GameObjectType_Emblem":
-            return "Emblem"
-
-        parts = []
-        power = inst_data.get("power")
-        toughness = inst_data.get("toughness")
-        if power is not None and toughness is not None:
-            parts.append(f"{power}/{toughness}")
-
-        colors = [_COLOR_LABELS.get(c, c) for c in (inst_data.get("colors") or [])]
-        parts.extend(colors)
-
-        subtypes = [s.replace("SubType_", "") for s in (inst_data.get("subtypes") or [])]
-        card_types = [
-            _CARD_TYPE_LABELS.get(t, t.replace("CardType_", ""))
-            for t in (inst_data.get("card_types") or [])
-        ]
-        parts.extend(subtypes)
-        parts.extend(card_types)
-        parts.append("Token")
-        return " ".join(parts)
+    def _generate_token_name(self, inst_data: dict) -> str:
+        return generate_token_name(inst_data)
 
     def _ensure_cards(self, real_card_ids: Set[int], special_objects: Dict[int, dict]):
         """Ensure all referenced cards/objects exist in the database.

@@ -327,14 +327,37 @@ This synthetic record flows through the import service and is stored in the `zon
 
 ## Import Service: Card Classification
 
-When a match is imported, `_collect_card_ids()` separates game object IDs into two buckets:
+There are two import paths; both implement the same classification logic and share constants from `src/services/import_service.py`:
 
-- **`real_card_ids`** — `GameObjectType_Card`, deck card IDs, and unrecognised types → looked up in Scryfall.
-- **`special_objects`** — tokens, emblems, adventure faces, MDFC backs, room halves → handled without Scryfall.
+| Import path | Entry point |
+|---|---|
+| CLI (`make import-log`) | `stats/management/commands/import_log.py` |
+| Web UI (`/import/`) | `stats/views.py` |
 
-Skipped object types (`GameObjectType_TriggerHolder`, `GameObjectType_Ability`, `GameObjectType_RevealedCard`) are never added to either set.
+Both import these shared symbols from `src/services/import_service.py`:
 
-For tokens and emblems, `_generate_token_name()` builds a name from the game state data:
+```python
+from src.services.import_service import (
+    _SKIP_OBJECT_TYPES,    # frozenset — engine objects to ignore entirely
+    _TOKEN_OBJECT_TYPES,   # frozenset — tokens/emblems to name from game state
+    generate_token_name,   # builds "1/1 Red Goblin Creature Token" etc.
+)
+```
+
+### `_collect_card_ids(match_data)`
+
+Separates game object IDs into two buckets:
+
+- **`real_card_ids`** (`Set[int]`) — `GameObjectType_Card`, deck card IDs, and action card IDs → looked up in Scryfall.
+- **`special_objects`** (`Dict[int, dict]`) — tokens, emblems, adventure faces, MDFC backs, room halves, Omens → handled without Scryfall (or with graceful fallback).
+
+Object types in `_SKIP_OBJECT_TYPES` (`TriggerHolder`, `Ability`, `RevealedCard`) are discarded and never added to either set.
+
+### `_ensure_cards(real_card_ids, special_objects, ...)`
+
+**Real cards** — batch Scryfall lookup; cards not found get an `Unknown Card (N)` placeholder and an `UnknownCard` tracking record.
+
+**Tokens / Emblems** — `generate_token_name()` builds a descriptive name from the game-state data and the row is inserted with `is_token=True`:
 
 ```
 power/toughness  colors  subtypes  card_types  "Token"
@@ -343,7 +366,9 @@ power/toughness  colors  subtypes  card_types  "Token"
 → "Emblem"
 ```
 
-All token/emblem rows in the `cards` table have `is_token=True` and `object_type="GameObjectType_Token"` (or `"GameObjectType_Emblem"`). The `source_grp_id` column stores the `grpId` of the parent card.
+**Other special objects** (Adventure, MDFCBack, RoomLeft, RoomRight, Omen) — Scryfall lookup attempted; on failure a `[Type] (N)` placeholder is stored with `object_type` set.
+
+All token/emblem rows in the `cards` table have `is_token=True`, `object_type="GameObjectType_Token"` (or `"GameObjectType_Emblem"`), and `source_grp_id` pointing to the parent card.
 
 ## Error Handling
 
