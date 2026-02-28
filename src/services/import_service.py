@@ -273,6 +273,12 @@ class DataImportService:
                 # Confirmed real card; remove from special_objects if seen earlier
                 real_card_ids.add(grp_id)
                 special_objects.pop(grp_id, None)
+            elif obj_type == "GameObjectType_Omen":
+                # Omen back-face grpIds share their Arena ID with the front-face
+                # GameObjectType_Card (the spell being cast). Card is processed first,
+                # so we must override: back-face IDs are not in Scryfall.
+                real_card_ids.discard(grp_id)
+                special_objects[grp_id] = inst_data
             elif grp_id not in real_card_ids:
                 # Token, emblem, adventure face, MDFC back, etc.
                 # First occurrence wins; real-card sighting takes priority above.
@@ -400,16 +406,26 @@ class DataImportService:
                         ),
                     )
                 else:
-                    # Friendly placeholder showing the object type
-                    label = obj_type.replace("GameObjectType_", "") if obj_type else "Unknown"
-                    logger.debug(f"Inserting {label} placeholder grp_id={grp_id}")
+                    # Friendly placeholder showing the object type.
+                    # For Omen back faces, try the front face (grpId - 1) for the real name.
+                    name = None
+                    effective_source = source_grp_id
+                    if obj_type == "GameObjectType_Omen":
+                        front_data = self.scryfall.get_card_by_arena_id(grp_id - 1)
+                        if front_data and " // " in (front_data.get("name") or ""):
+                            name = front_data["name"].split(" // ")[1]
+                            effective_source = grp_id - 1
+                    if name is None:
+                        label = obj_type.replace("GameObjectType_", "") if obj_type else "Unknown"
+                        name = f"[{label}] ({grp_id})"
+                    logger.debug(f"Inserting special object grp_id={grp_id} as '{name}'")
                     self.db.execute(
                         """
                         INSERT OR IGNORE INTO cards (
                             grp_id, name, object_type, source_grp_id
                         ) VALUES (?, ?, ?, ?)
                     """,
-                        (grp_id, f"[{label}] ({grp_id})", obj_type, source_grp_id),
+                        (grp_id, name, obj_type, effective_source),
                     )
 
     def _import_actions(self, match_db_id: int, match: MatchData):

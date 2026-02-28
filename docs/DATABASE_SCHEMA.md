@@ -85,6 +85,7 @@ Not all rows in this table represent real MTG cards. The `object_type` column re
 | `NULL` | `False` | Real card — name and metadata from Scryfall |
 | `GameObjectType_Token` | `True` | Name generated from game state (power/toughness, color, subtype) |
 | `GameObjectType_Emblem` | `True` | Always stored as `"Emblem"` |
+| `GameObjectType_Omen` | `False` | MDFC back-face Omen sorcery/instant. grpId is not in Scryfall; name resolved from front face (`grpId - 1`) e.g. `"Roost Seek"`. `source_grp_id` = front-face grpId |
 | `GameObjectType_Adventure` | `False` | Scryfall attempted; `[Adventure] (N)` fallback |
 | `GameObjectType_MDFCBack` | `False` | Scryfall attempted; `[MDFCBack] (N)` fallback |
 | `GameObjectType_RoomLeft/Right` | `False` | Scryfall attempted; `[Room…] (N)` fallback |

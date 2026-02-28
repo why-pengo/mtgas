@@ -252,6 +252,12 @@ class Command(BaseCommand):
             if obj_type == "GameObjectType_Card":
                 real_card_ids.add(grp_id)
                 special_objects.pop(grp_id, None)
+            elif obj_type == "GameObjectType_Omen":
+                # Omen back-face grpIds share their Arena ID with the front-face
+                # GameObjectType_Card (the spell being cast). Card is processed first,
+                # so we must override: back-face IDs are not in Scryfall.
+                real_card_ids.discard(grp_id)
+                special_objects[grp_id] = inst_data
             elif grp_id not in real_card_ids:
                 special_objects.setdefault(grp_id, inst_data)
 
@@ -384,13 +390,23 @@ class Command(BaseCommand):
                         },
                     )
                 else:
-                    label = obj_type.replace("GameObjectType_", "") if obj_type else "Unknown"
+                    # For Omen back faces, try the front face (grpId - 1) for the real name.
+                    name = None
+                    effective_source = source_grp_id
+                    if obj_type == "GameObjectType_Omen":
+                        front_data = scryfall.get_card_by_arena_id(grp_id - 1)
+                        if front_data and " // " in (front_data.get("name") or ""):
+                            name = front_data["name"].split(" // ")[1]
+                            effective_source = grp_id - 1
+                    if name is None:
+                        label = obj_type.replace("GameObjectType_", "") if obj_type else "Unknown"
+                        name = f"[{label}] ({grp_id})"
                     Card.objects.get_or_create(
                         grp_id=grp_id,
                         defaults={
-                            "name": f"[{label}] ({grp_id})",
+                            "name": name,
                             "object_type": obj_type,
-                            "source_grp_id": source_grp_id,
+                            "source_grp_id": effective_source,
                         },
                     )
 

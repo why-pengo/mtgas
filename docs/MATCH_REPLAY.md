@@ -138,6 +138,7 @@ Both the player's and opponent's life changes are captured by the parser and sto
 
 - **`turn_number = 0`** on some events: Resolved by the parser now tracking the last-seen turn number and applying it to subsequent messages that lack `turnInfo`. Opening-hand reveals and similar pre-game transfers may still show turn 0 as expected.
 - **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as `"Unknown Card (N)"`. Run `make download-cards` to populate the cache. Note that tokens and other non-card game objects are **not** looked up in Scryfall — they are stored with generated names (see *Import Service: Card Classification* above).
+- **Omen back-face cards**: Tarkir Dragonstorm Omen sorceries/instants (e.g. *Roost Seek*) have Arena grpIds not directly in Scryfall. The import service resolves their name from the paired front-face card (`grpId - 1`) and stores `source_grp_id` pointing to that front face. They display in the replay with their resolved name and are **not** flagged as tokens — zone transfer events (cast, resolve, etc.) show normally.
 - **Opponent's cards**: Cards played from the opponent's hand only become known when they enter the battlefield. Prior to that they appear as anonymous transfers.
 
 ---
@@ -154,5 +155,6 @@ Both the player's and opponent's life changes are captured by the parser and sto
 | `src/parser/log_parser.py` — `_process_game_state_message()` | Parser: extracts `AnnotationType_ZoneTransfer`; emits synthetic entries for `AnnotationType_TokenCreated` |
 | `stats/models.py` — `ZoneTransfer` | ORM model for zone transfer records (`category` field carries `"TokenCreated"` for synthetic entries) |
 | `stats/models.py` — `Card` | `is_token`, `object_type`, `source_grp_id` fields identify token/non-card game objects |
-| `src/services/import_service.py` — `_collect_card_ids()` | Splits game object IDs into real cards vs. special objects (tokens, faces, system objects) |
+| `src/services/import_service.py` — `_collect_card_ids()` | Splits game object IDs into real cards vs. special objects; `GameObjectType_Omen` override discards prior Card classification |
 | `src/services/import_service.py` — `_generate_token_name()` | Builds human-readable token names from game-state data |
+| `src/services/import_service.py` — `_ensure_cards()` Omen path | Resolves Omen back-face name via `grpId - 1` front-face lookup |

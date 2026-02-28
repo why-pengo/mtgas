@@ -253,6 +253,7 @@ Not all game objects are real MTG cards. The `type` field determines how the obj
 | `GameObjectType_Card` | A real MTG card | Looked up in Scryfall; `Unknown Card (N)` fallback |
 | `GameObjectType_Token` | Token created by a card ability | Name generated from game state (e.g. `"1/1 Red Goblin Creature Token"`); stored with `is_token=True` |
 | `GameObjectType_Emblem` | Planeswalker emblem | Stored as `"Emblem"` with `is_token=True` |
+| `GameObjectType_Omen` | MDFC back-face Omen sorcery/instant (e.g. *Roost Seek*) | Back-face grpId not in Scryfall. **Overrides** any prior `GameObjectType_Card` classification for the same grpId. Name resolved via front face (`grpId - 1`); `source_grp_id` = front-face grpId |
 | `GameObjectType_Adventure` | Adventure half of an adventure card | Scryfall lookup attempted; `[Adventure] (N)` fallback |
 | `GameObjectType_MDFCBack` | Back face of a modal double-faced card | Scryfall lookup attempted; `[MDFCBack] (N)` fallback |
 | `GameObjectType_RoomLeft/Right` | Room half of a Room card | Scryfall lookup attempted; `[Room…] (N)` fallback |
@@ -353,6 +354,8 @@ Separates game object IDs into two buckets:
 
 Object types in `_SKIP_OBJECT_TYPES` (`TriggerHolder`, `Ability`, `RevealedCard`) are discarded and never added to either set.
 
+**Omen override:** `GameObjectType_Omen` objects use the **same grpId** as the `GameObjectType_Card` instance that represents the Omen sorcery/instant being cast from hand. Because the Card instance is always processed before the Omen instance, the Omen type explicitly calls `real_card_ids.discard(grp_id)` and overwrites `special_objects[grp_id]` — ensuring the back-face grpId never enters the Scryfall lookup path.
+
 ### `_ensure_cards(real_card_ids, special_objects, ...)`
 
 **Real cards** — batch Scryfall lookup; cards not found get an `Unknown Card (N)` placeholder and an `UnknownCard` tracking record.
@@ -366,7 +369,15 @@ power/toughness  colors  subtypes  card_types  "Token"
 → "Emblem"
 ```
 
-**Other special objects** (Adventure, MDFCBack, RoomLeft, RoomRight, Omen) — Scryfall lookup attempted; on failure a `[Type] (N)` placeholder is stored with `object_type` set.
+**Omen back faces** — Scryfall is tried at the grpId first. If that fails (expected for TDM Omen grpIds), the import service tries `grpId - 1` (the MDFC front face). If that card has `" // "` in its name, the back-face portion becomes the stored name and `source_grp_id` is set to the front-face grpId:
+
+```
+grpId 95680 → Scryfall miss
+grpId 95679 → "Sagu Wildling // Roost Seek"
+→ stored as name="Roost Seek", source_grp_id=95679
+```
+
+**Other special objects** (Adventure, MDFCBack, RoomLeft, RoomRight) — Scryfall lookup attempted; on failure a `[Type] (N)` placeholder is stored with `object_type` set.
 
 All token/emblem rows in the `cards` table have `is_token=True`, `object_type="GameObjectType_Token"` (or `"GameObjectType_Emblem"`), and `source_grp_id` pointing to the parent card.
 
