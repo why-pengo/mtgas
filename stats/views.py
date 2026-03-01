@@ -722,6 +722,11 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     # Count unknown cards in this deck
     unknown_cards_count = UnknownCard.objects.filter(deck=deck, is_resolved=False).count()
 
+    total_cards = sum(dc.quantity for dc in deck_cards)
+    total_lands = sum(dc.quantity for dc in deck_cards if "Land" in (dc.card.type_line or ""))
+    land_pct = round(total_lands / total_cards * 100, 1) if total_cards > 0 else 0
+    suggested_lands = round(total_cards * 17 / 40)
+
     return render(
         request,
         "deck_detail.html",
@@ -733,6 +738,10 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
             "stats": stats,
             "matchups": matchups,
             "unknown_cards_count": unknown_cards_count,
+            "total_cards": total_cards,
+            "total_lands": total_lands,
+            "land_pct": land_pct,
+            "suggested_lands": suggested_lands,
         },
     )
 
