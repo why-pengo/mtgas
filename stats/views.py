@@ -1319,13 +1319,24 @@ def _ensure_cards(
                         if first.get("card_types"):
                             context_info["arena_card_types"] = first["card_types"]
 
+                # Only associate the player's own deck; opponent cards get deck=None
+                card_deck = deck
+                if deck and match_data and match_data.player_seat_id and match_data.card_instances:
+                    owner_seats = {
+                        ci.get("owner_seat")
+                        for ci in match_data.card_instances.values()
+                        if ci.get("grp_id") == grp_id
+                    }
+                    if owner_seats and match_data.player_seat_id not in owner_seats:
+                        card_deck = None
+
                 logger.info(
                     f"Unknown card discovered - grp_id: {grp_id}, "
-                    f"deck: {deck.name if deck else 'N/A'}, "
+                    f"deck: {card_deck.name if card_deck else 'N/A'}, "
                     f"match: {match.match_id[:8] if match else 'N/A'}"
                 )
                 cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
-                unknown_cards_to_log.append((grp_id, context_info))
+                unknown_cards_to_log.append((grp_id, context_info, card_deck))
 
         if cards_to_create:
             Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
@@ -1333,13 +1344,13 @@ def _ensure_cards(
 
         if unknown_cards_to_log:
             unknown_records = []
-            for grp_id, context in unknown_cards_to_log:
+            for grp_id, context, card_deck in unknown_cards_to_log:
                 card = Card.objects.get(grp_id=grp_id)
                 unknown_records.append(
                     UnknownCard(
                         card=card,
                         match=match,
-                        deck=deck,
+                        deck=card_deck,
                         import_session=import_session,
                         raw_data=context,
                         is_resolved=False,
