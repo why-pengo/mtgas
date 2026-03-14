@@ -92,6 +92,15 @@
                                     <td><strong>Cards in Database:</strong></td>
                                     <td>{{ db_card_count }}</td>
                                 </tr>
+                                {% if unknown_card_count %}
+                                <tr>
+                                    <td><strong>Unidentified Cards:</strong></td>
+                                    <td>
+                                        <span class="text-warning">{{ unknown_card_count }}</span>
+                                        <small class="text-muted">— not found in Scryfall index</small>
+                                    </td>
+                                </tr>
+                                {% endif %}
                                 <tr>
                                     <td colspan="2">
                                         <small class="text-muted">
@@ -103,10 +112,19 @@
                         </table>
 
                         {% if bulk_file_exists and total_cards > 0 %}
-                        <div class="alert alert-success mt-3">
-                            <strong>✓ Ready to import matches!</strong><br>
-                            Card data is downloaded and indexed.
-                        </div>
+                            {% if unknown_card_count %}
+                            <div class="alert alert-warning mt-3">
+                                <strong>⚠ {{ unknown_card_count }} unidentified card{{ unknown_card_count|pluralize }}</strong><br>
+                                These cards are from recent Arena sets not yet indexed by Scryfall.
+                                Re-downloading card data may resolve some of them. You can also run
+                                <code>python manage.py resolve_unknown_cards</code> after downloading.
+                            </div>
+                            {% else %}
+                            <div class="alert alert-success mt-3">
+                                <strong>✓ Ready to import matches!</strong><br>
+                                Card data is downloaded and indexed.
+                            </div>
+                            {% endif %}
                         {% else %}
                         <div class="alert alert-warning mt-3">
                             <strong>⚠ Card data needed</strong><br>

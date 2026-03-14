@@ -56,7 +56,7 @@ Stores card metadata. Rows are populated from Scryfall bulk data for real MTG ca
 | Column | Type | Description |
 |--------|------|-------------|
 | `grp_id` | INTEGER (PK) | MTG Arena's card group ID |
-| `name` | VARCHAR(255) | Card name (generated for tokens; e.g. `"1/1 Red Goblin Creature Token"`) |
+| `name` | VARCHAR(255) | Card name (generated for tokens; e.g. `"1/1 Red Goblin Creature Token"`). Unknown Arena cards get a descriptive placeholder built from game-state data, e.g. `"Basic Land — Plains [98592]"` or `"{3}{U}{U} Legendary Creature — Human Villain [97852]"`; falls back to `"Unknown Card (N)"` when no type data is available |
 | `mana_cost` | VARCHAR(100) | Mana cost string (e.g., `"{2}{U}{U}"`) |
 | `cmc` | FLOAT | Converted mana cost / mana value |
 | `type_line` | VARCHAR(255) | Card type (e.g., `"Creature — Human Wizard"`) |
@@ -82,7 +82,7 @@ Not all rows in this table represent real MTG cards. The `object_type` column re
 
 | `object_type` | `is_token` | How populated |
 |---------------|-----------|---------------|
-| `NULL` | `False` | Real card — name and metadata from Scryfall |
+| `NULL` | `False` | Real card — name and metadata from Scryfall. If the `arena_id` is absent from the bulk data (e.g. very recently released sets), a descriptive placeholder is stored instead: `"Basic Land — Plains [98592]"`. `type_line`, `colors`, `power`, `toughness`, and `mana_cost` are populated from game-state data when available. |
 | `GameObjectType_Token` | `True` | Name generated from game state (power/toughness, color, subtype) |
 | `GameObjectType_Emblem` | `True` | Always stored as `"Emblem"` |
 | `GameObjectType_Omen` | `False` | MDFC back-face Omen sorcery/instant. grpId is not in Scryfall; name resolved from front face (`grpId - 1`) e.g. `"Roost Seek"`. `source_grp_id` = front-face grpId |

@@ -70,7 +70,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "avg_duration": round(avg_stats["avg_duration"] or 0, 0),
     }
 
-    # Check card data status
+    # Check card data status and unknown card warnings
     scryfall = get_scryfall()
     try:
         card_stats = scryfall.stats()
@@ -79,6 +79,15 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     except Exception:
         card_data_ready = False
         card_count = 0
+
+    # Warn when unknown cards appear in real game usage (decks or cast spells)
+    unknown_card_count = Card.objects.filter(name__startswith="Unknown Card").count()
+    unknown_in_decks = (
+        DeckCard.objects.filter(card__name__startswith="Unknown Card").exists()
+        if unknown_card_count
+        else False
+    )
+    show_unknown_warning = unknown_card_count > 0 and (unknown_in_decks or unknown_card_count > 5)
 
     # Recent matches
     recent_matches = Match.objects.select_related("deck").order_by("-start_time")[:5]
@@ -140,6 +149,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "daily_stats": daily_stats_list,
             "card_data_ready": card_data_ready,
             "card_count": card_count,
+            "unknown_card_count": unknown_card_count,
+            "show_unknown_warning": show_unknown_warning,
         },
     )
 
@@ -989,8 +1000,9 @@ def card_data(request: HttpRequest) -> HttpResponse:
         bulk_file_date = None
         index_file_date = None
 
-    # Get database card count
+    # Get database card count and unknown card stats
     db_card_count = Card.objects.count()
+    unknown_card_count = Card.objects.filter(name__startswith="Unknown Card").count()
 
     # Handle download request
     if request.method == "POST":
@@ -1033,6 +1045,7 @@ def card_data(request: HttpRequest) -> HttpResponse:
             "bulk_file_date": bulk_file_date,
             "index_file_date": index_file_date,
             "db_card_count": db_card_count,
+            "unknown_card_count": unknown_card_count,
         },
     )
 

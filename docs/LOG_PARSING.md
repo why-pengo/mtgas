@@ -234,6 +234,7 @@ Game objects contain card information. Every `gameObjects` entry is stored in `c
     "type": "GameObjectType_Card",
     "cardTypes": ["CardType_Creature"],
     "subtypes": ["SubType_Human", "SubType_Wizard"],
+    "superTypes": ["SuperType_Legendary"],  # e.g. Basic, Legendary, Snow
     "color": ["ColorType_Blue"],
     "power": {"value": 2},
     "toughness": {"value": 1},
@@ -250,14 +251,13 @@ Not all game objects are real MTG cards. The `type` field determines how the obj
 
 | `type` | Description | Card DB treatment |
 |--------|-------------|-------------------|
-| `GameObjectType_Card` | A real MTG card | Looked up in Scryfall; `Unknown Card (N)` fallback |
+| `GameObjectType_Card` | A real MTG card | Looked up in Scryfall by `arena_id`. If not found (e.g. newly released set not yet indexed), a descriptive placeholder is built from game-state data: `"Basic Land — Plains [98592]"`. Falls back to `"Unknown Card (N)"` when no type info is available. `type_line`, `colors`, `power`/`toughness`, and `mana_cost` are stored from game state even for unknown cards. |
 | `GameObjectType_Token` | Token created by a card ability | Name generated from game state (e.g. `"1/1 Red Goblin Creature Token"`); stored with `is_token=True` |
 | `GameObjectType_Emblem` | Planeswalker emblem | Stored as `"Emblem"` with `is_token=True` |
 | `GameObjectType_Omen` | MDFC back-face Omen sorcery/instant (e.g. *Roost Seek*) | Back-face grpId not in Scryfall. **Overrides** any prior `GameObjectType_Card` classification for the same grpId. Name resolved via front face (`grpId - 1`); `source_grp_id` = front-face grpId |
 | `GameObjectType_Adventure` | Adventure half of an adventure card | Scryfall lookup attempted; `[Adventure] (N)` fallback |
 | `GameObjectType_MDFCBack` | Back face of a modal double-faced card | Scryfall lookup attempted; `[MDFCBack] (N)` fallback |
 | `GameObjectType_RoomLeft/Right` | Room half of a Room card | Scryfall lookup attempted; `[Room…] (N)` fallback |
-| `GameObjectType_Omen` | Omen card | Scryfall lookup attempted |
 | `GameObjectType_TriggerHolder` | Internal engine trigger object | **Skipped entirely** — not stored in the cards table |
 | `GameObjectType_Ability` | Activated/triggered ability on the stack | **Skipped entirely** |
 | `GameObjectType_RevealedCard` | Revealed card from an effect | **Skipped entirely** |
@@ -349,16 +349,35 @@ from src.services.import_service import (
 
 Separates game object IDs into two buckets:
 
-- **`real_card_ids`** (`Set[int]`) — `GameObjectType_Card`, deck card IDs, and action card IDs → looked up in Scryfall.
+- **`real_cards`** (`Dict[int, dict]`) — `GameObjectType_Card`, deck card IDs, and action card IDs → looked up in Scryfall. The dict maps `grp_id` to the richest `card_instances` entry seen for that grpId (containing `card_types`, `subtypes`, `super_types`, `colors`, `power`, `toughness`). Deck-only cards (no game instance) get an empty dict as their value.
 - **`special_objects`** (`Dict[int, dict]`) — tokens, emblems, adventure faces, MDFC backs, room halves, Omens → handled without Scryfall (or with graceful fallback).
 
 Object types in `_SKIP_OBJECT_TYPES` (`TriggerHolder`, `Ability`, `RevealedCard`) are discarded and never added to either set.
 
-**Omen override:** `GameObjectType_Omen` objects use the **same grpId** as the `GameObjectType_Card` instance that represents the Omen sorcery/instant being cast from hand. Because the Card instance is always processed before the Omen instance, the Omen type explicitly calls `real_card_ids.discard(grp_id)` and overwrites `special_objects[grp_id]` — ensuring the back-face grpId never enters the Scryfall lookup path.
+**Omen override:** `GameObjectType_Omen` objects use the **same grpId** as the `GameObjectType_Card` instance that represents the Omen sorcery/instant being cast from hand. Because the Card instance is always processed before the Omen instance, the Omen type explicitly calls `real_cards.pop(grp_id, None)` and overwrites `special_objects[grp_id]` — ensuring the back-face grpId never enters the Scryfall lookup path.
 
-### `_ensure_cards(real_card_ids, special_objects, ...)`
+### `_ensure_cards(real_cards, special_objects, cast_mana_costs=None)`
 
-**Real cards** — batch Scryfall lookup; cards not found get an `Unknown Card (N)` placeholder and an `UnknownCard` tracking record.
+**Real cards** — batch Scryfall lookup by `arena_id`. Cards found in the index are inserted with full metadata. Cards **not found** (e.g. grpIds from sets released after the last `download_cards` run) get a descriptive placeholder built by `generate_unknown_card_description()`:
+
+```
+game-state data:  superTypes=["SuperType_Basic"], cardTypes=["CardType_Land"], subtypes=["SubType_Plains"]
+→ stored name:    "Basic Land — Plains [98592]"
+
+game-state data:  superTypes=["SuperType_Legendary"], cardTypes=["CardType_Creature"], subtypes=["SubType_Human","SubType_Villain"], mana cost from cast action
+→ stored name:    "{3}{U}{U} Legendary Creature — Human Villain [97852]"
+
+no game-state data (deck-only card never seen in play)
+→ stored name:    "Unknown Card (98599)"
+```
+
+`type_line`, `colors`, `power`, `toughness`, and `mana_cost` are populated from game-state data even for unknown cards. Mana cost is sourced from `_collect_cast_mana_costs()`, which scans `ActionType_Cast` actions for matching grpIds.
+
+To resolve existing `"Unknown Card (N)"` entries after a fresh Scryfall download, run:
+
+```bash
+python manage.py resolve_unknown_cards [--dry-run]
+```
 
 **Tokens / Emblems** — `generate_token_name()` builds a descriptive name from the game-state data and the row is inserted with `is_token=True`:
 

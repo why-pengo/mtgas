@@ -15,6 +15,16 @@
 </div>
 {% endif %}
 
+{% if show_unknown_warning %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <strong>ℹ {{ unknown_card_count }} card{{ unknown_card_count|pluralize }} in your matches are not yet identified by Scryfall.</strong><br>
+    These are real cards from recent sets that Scryfall hasn't indexed with Arena IDs yet.
+    Re-downloading card data or running <code>resolve_unknown_cards</code> may fix some of them.
+    <a href="{% url 'stats:card_data' %}" class="alert-link">Manage Card Data →</a>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- Overall Stats -->
 <div class="row mb-4">
     <div class="col-md-3">

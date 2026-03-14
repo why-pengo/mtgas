@@ -404,6 +404,7 @@ class MTGALogParser:
                     "grp_id": obj.get("grpId"),
                     "name": obj.get("name"),
                     "type": obj.get("type"),
+                    "super_types": obj.get("superTypes", []),
                     "card_types": obj.get("cardTypes", []),
                     "subtypes": obj.get("subtypes", []),
                     "colors": obj.get("color", []),

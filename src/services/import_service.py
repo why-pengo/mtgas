@@ -47,7 +47,89 @@ _CARD_TYPE_LABELS: Dict[str, str] = {
     "CardType_Planeswalker": "Planeswalker",
     "CardType_Instant": "Instant",
     "CardType_Sorcery": "Sorcery",
+    "CardType_Battle": "Battle",
 }
+_MANA_COLOR_SYMBOLS: Dict[str, str] = {
+    "ManaColor_White": "W",
+    "ManaColor_Blue": "U",
+    "ManaColor_Black": "B",
+    "ManaColor_Red": "R",
+    "ManaColor_Green": "G",
+    "ManaColor_Colorless": "C",
+}
+
+
+def format_mana_cost(mana_cost: list) -> str:
+    """Convert Arena mana cost JSON to standard MTG notation like {2}{U}{R}."""
+    parts = []
+    for pip in mana_cost or []:
+        colors = pip.get("color", [])
+        count = pip.get("count", 1)
+        if not colors or colors == ["ManaColor_Generic"]:
+            parts.append(f"{{{count}}}")
+        else:
+            for _ in range(count):
+                for color in colors:
+                    symbol = _MANA_COLOR_SYMBOLS.get(color, "?")
+                    parts.append(f"{{{symbol}}}")
+    return "".join(parts)
+
+
+def build_type_line(inst_data: dict) -> str:
+    """Build a MTG-style type line from game-state data (e.g. 'Legendary Creature — Human Villain')."""
+    super_types = [st.replace("SuperType_", "") for st in (inst_data.get("super_types") or [])]
+    card_types = [
+        _CARD_TYPE_LABELS.get(t, t.replace("CardType_", ""))
+        for t in (inst_data.get("card_types") or [])
+    ]
+    subtypes = [s.replace("SubType_", "") for s in (inst_data.get("subtypes") or [])]
+
+    main = " ".join(super_types + card_types)
+    if subtypes:
+        return f"{main} \u2014 {' '.join(subtypes)}"
+    return main
+
+
+def generate_unknown_card_description(
+    grp_id: int, inst_data: dict, mana_cost_json: Optional[list] = None
+) -> str:
+    """Build a descriptive placeholder name for a card not found in Scryfall.
+
+    Produces names like:
+        "Legendary Creature — Human Villain [97852]"
+        "Basic Land — Plains [98592]"
+        "{3}{U}{U} Creature — Wizard [97854]"
+    Falls back to "Unknown Card (97852)" when no type info is available.
+    """
+    parts = []
+
+    super_types = [st.replace("SuperType_", "") for st in (inst_data.get("super_types") or [])]
+    card_types = [
+        _CARD_TYPE_LABELS.get(t, t.replace("CardType_", ""))
+        for t in (inst_data.get("card_types") or [])
+    ]
+    subtypes = [s.replace("SubType_", "") for s in (inst_data.get("subtypes") or [])]
+
+    if not card_types and not super_types:
+        return f"Unknown Card ({grp_id})"
+
+    if mana_cost_json:
+        mana_str = format_mana_cost(mana_cost_json)
+        if mana_str:
+            parts.append(mana_str)
+
+    parts.extend(super_types)
+    parts.extend(card_types)
+    if subtypes:
+        parts.append("\u2014")
+        parts.extend(subtypes)
+
+    power = inst_data.get("power")
+    toughness = inst_data.get("toughness")
+    if power is not None and toughness is not None:
+        parts.append(f"({power}/{toughness})")
+
+    return f"{' '.join(parts)} [{grp_id}]"
 
 
 def generate_token_name(inst_data: dict) -> str:
@@ -150,8 +232,9 @@ class DataImportService:
             deck_db_id = self._ensure_deck(match)
 
         # Collect all unique card IDs and ensure they're in the cards table
-        card_grp_ids, special_objects = self._collect_card_ids(match)
-        self._ensure_cards(card_grp_ids, special_objects)
+        real_cards, special_objects = self._collect_card_ids(match)
+        cast_mana_costs = self._collect_cast_mana_costs(match)
+        self._ensure_cards(real_cards, special_objects, cast_mana_costs)
 
         # Calculate duration
         duration = None
@@ -243,23 +326,23 @@ class DataImportService:
 
         return deck_db_id
 
-    def _collect_card_ids(self, match: MatchData) -> Tuple[Set[int], Dict[int, dict]]:
+    def _collect_card_ids(self, match: MatchData) -> Tuple[Dict[int, dict], Dict[int, dict]]:
         """Collect card IDs from match data.
 
         Returns:
-            real_card_ids: grpIds that should be looked up in Scryfall
+            real_cards: grpId → instance_data for cards that should be looked up in Scryfall
                 (GameObjectType_Card, deck cards, or unrecognised types).
             special_objects: grpId → instance_data for tokens, emblems, and
                 named card-face types (Adventure, MDFCBack, etc.) that may or
                 may not be in Scryfall.
         """
-        real_card_ids: Set[int] = set()
+        real_cards: Dict[int, dict] = {}
         special_objects: Dict[int, dict] = {}
 
-        # Deck cards are always real cards
+        # Deck cards are always real cards (no instance data available)
         for card in match.deck_cards:
             if card.get("cardId"):
-                real_card_ids.add(card["cardId"])
+                real_cards.setdefault(card["cardId"], {})
 
         # Categorise each card instance by its Arena object type
         for inst_data in match.card_instances.values():
@@ -270,16 +353,18 @@ class DataImportService:
             if obj_type in _SKIP_OBJECT_TYPES:
                 continue  # Engine-only objects — ignore entirely
             if obj_type == "GameObjectType_Card":
-                # Confirmed real card; remove from special_objects if seen earlier
-                real_card_ids.add(grp_id)
+                # Confirmed real card; remove from special_objects if seen earlier.
+                # Prefer instance with the most data (first public sighting wins).
+                if grp_id not in real_cards or not real_cards[grp_id].get("card_types"):
+                    real_cards[grp_id] = inst_data
                 special_objects.pop(grp_id, None)
             elif obj_type == "GameObjectType_Omen":
                 # Omen back-face grpIds share their Arena ID with the front-face
                 # GameObjectType_Card (the spell being cast). Card is processed first,
                 # so we must override: back-face IDs are not in Scryfall.
-                real_card_ids.discard(grp_id)
+                real_cards.pop(grp_id, None)
                 special_objects[grp_id] = inst_data
-            elif grp_id not in real_card_ids:
+            elif grp_id not in real_cards:
                 # Token, emblem, adventure face, MDFC back, etc.
                 # First occurrence wins; real-card sighting takes priority above.
                 special_objects.setdefault(grp_id, inst_data)
@@ -288,21 +373,48 @@ class DataImportService:
         for action in match.actions:
             cid = action.get("card_grp_id")
             if cid and cid not in special_objects:
-                real_card_ids.add(cid)
+                real_cards.setdefault(cid, {})
 
-        return real_card_ids, special_objects
+        return real_cards, special_objects
 
     def _generate_token_name(self, inst_data: dict) -> str:
         return generate_token_name(inst_data)
 
-    def _ensure_cards(self, real_card_ids: Set[int], special_objects: Dict[int, dict]):
+    def _collect_cast_mana_costs(self, match: MatchData) -> Dict[int, list]:
+        """Collect mana costs paid for cast actions, keyed by card grpId.
+
+        Returns the first observed mana cost for each card. Used to enrich
+        unknown card placeholders with partial mana cost information.
+        """
+        costs: Dict[int, list] = {}
+        for action in match.actions:
+            if action.get("action_type") != "ActionType_Cast":
+                continue
+            cid = action.get("card_grp_id")
+            mana_cost = action.get("mana_cost")
+            if cid and mana_cost and cid not in costs:
+                costs[cid] = mana_cost
+        return costs
+
+    def _ensure_cards(
+        self,
+        real_cards: Dict[int, dict],
+        special_objects: Dict[int, dict],
+        cast_mana_costs: Optional[Dict[int, list]] = None,
+    ):
         """Ensure all referenced cards/objects exist in the database.
 
-        * real_card_ids: looked up in Scryfall; fall back to "Unknown Card (N)".
+        * real_cards: grpId → inst_data; looked up in Scryfall; fall back to a
+          descriptive placeholder built from game-state data.
         * special_objects: tokens/emblems get a generated name; other face types
           try Scryfall first and use a descriptive placeholder on failure.
+        * cast_mana_costs: optional grpId → mana_cost list from cast actions,
+          used to enrich unknown card placeholders.
         """
-        all_ids = real_card_ids | set(special_objects)
+        if cast_mana_costs is None:
+            cast_mana_costs = {}
+
+        all_ids = set(real_cards) | set(special_objects)
         if not all_ids:
             return
 
@@ -312,7 +424,7 @@ class DataImportService:
         )
         existing_ids = {row["grp_id"] for row in cursor.fetchall()}
 
-        missing_real = real_card_ids - existing_ids
+        missing_real = {gid: real_cards[gid] for gid in (set(real_cards) - existing_ids)}
         missing_special = {gid: d for gid, d in special_objects.items() if gid not in existing_ids}
 
         if missing_real or missing_special:
@@ -321,8 +433,8 @@ class DataImportService:
                 f"processing {len(missing_special)} special objects..."
             )
 
-        # ── Real cards: look up Scryfall, fall back to Unknown placeholder ──
-        for grp_id in missing_real:
+        # ── Real cards: look up Scryfall, fall back to descriptive placeholder ──
+        for grp_id, inst_data in missing_real.items():
             card_data = self.scryfall.get_card_by_arena_id(grp_id)
             if card_data:
                 self.db.execute(
@@ -351,10 +463,22 @@ class DataImportService:
                     ),
                 )
             else:
-                logger.debug(f"Card grp_id={grp_id} not found in Scryfall")
+                logger.debug(f"Card grp_id={grp_id} not found in Scryfall, building placeholder")
+                mana_cost_json = cast_mana_costs.get(grp_id)
+                name = generate_unknown_card_description(grp_id, inst_data, mana_cost_json)
+                type_line = build_type_line(inst_data) or None
+                colors = inst_data.get("colors") or []
+                color_json = json.dumps([_COLOR_LABELS.get(c, c) for c in colors] if colors else [])
+                power = inst_data.get("power")
+                toughness = inst_data.get("toughness")
+                mana_cost_str = format_mana_cost(mana_cost_json) if mana_cost_json else None
                 self.db.execute(
-                    "INSERT OR IGNORE INTO cards (grp_id, name) VALUES (?, ?)",
-                    (grp_id, f"Unknown Card ({grp_id})"),
+                    """
+                    INSERT OR IGNORE INTO cards (
+                        grp_id, name, type_line, colors, power, toughness, mana_cost
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (grp_id, name, type_line, color_json, power, toughness, mana_cost_str),
                 )
 
         # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
