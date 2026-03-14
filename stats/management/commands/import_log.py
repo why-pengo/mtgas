@@ -21,9 +21,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
 from src.parser.log_parser import MatchData, MTGALogParser  # noqa: E402
 from src.services.import_service import (  # noqa: E402
+    _COLOR_LABELS,
     _SKIP_OBJECT_TYPES,
     _TOKEN_OBJECT_TYPES,
+    build_type_line,
+    format_mana_cost,
     generate_token_name,
+    generate_unknown_card_description,
 )
 from src.services.scryfall import get_scryfall  # noqa: E402
 from stats.models import (  # noqa: E402
@@ -183,8 +187,8 @@ class Command(BaseCommand):
 
         # Collect all unique card IDs and ensure they're in the cards table
         # Pass match and deck for unknown card tracking
-        real_card_ids, special_objects = self._collect_card_ids(match_data)
-        self._ensure_cards(real_card_ids, special_objects, scryfall, match, deck)
+        real_cards, special_objects = self._collect_card_ids(match_data)
+        self._ensure_cards(real_cards, special_objects, scryfall, match, deck)
 
         # Import actions (significant ones only)
         self._import_actions(match, match_data)
@@ -209,8 +213,9 @@ class Command(BaseCommand):
 
         if created and match_data.deck_cards:
             # Ensure cards exist first - pass None for match since it doesn't exist yet
-            card_ids = {c.get("cardId") for c in match_data.deck_cards if c.get("cardId")}
-            self._ensure_cards(card_ids, {}, scryfall, None, deck)
+            # Deck cards have no instance data at this stage, so use empty dicts.
+            card_ids_dict = {c["cardId"]: {} for c in match_data.deck_cards if c.get("cardId")}
+            self._ensure_cards(card_ids_dict, {}, scryfall, None, deck)
 
             # Add deck cards
             for card_data in match_data.deck_cards:
@@ -227,20 +232,21 @@ class Command(BaseCommand):
 
         return deck
 
-    def _collect_card_ids(self, match_data: MatchData) -> tuple[set[int], dict[int, dict]]:
+    def _collect_card_ids(self, match_data: MatchData) -> tuple[dict[int, dict], dict[int, dict]]:
         """Collect card IDs from match data.
 
         Returns:
-            real_card_ids: grpIds that should be looked up in Scryfall.
+            real_cards: grpId → instance_data (empty dict when only seen in deck list)
+                for cards that should be looked up in Scryfall.
             special_objects: grpId → instance_data for tokens, emblems, and
                 named card-face types that are not standard cards.
         """
-        real_card_ids: set[int] = set()
+        real_cards: dict[int, dict] = {}
         special_objects: dict[int, dict] = {}
 
         for card in match_data.deck_cards:
             if card.get("cardId"):
-                real_card_ids.add(card["cardId"])
+                real_cards.setdefault(card["cardId"], {})
 
         for inst_data in match_data.card_instances.values():
             grp_id = inst_data.get("grp_id")
@@ -250,48 +256,58 @@ class Command(BaseCommand):
             if obj_type in _SKIP_OBJECT_TYPES:
                 continue
             if obj_type == "GameObjectType_Card":
-                real_card_ids.add(grp_id)
+                # Prefer instance with type data over a bare deck-card placeholder.
+                if grp_id not in real_cards or not real_cards[grp_id].get("card_types"):
+                    real_cards[grp_id] = inst_data
                 special_objects.pop(grp_id, None)
             elif obj_type == "GameObjectType_Omen":
-                # Omen back-face grpIds share their Arena ID with the front-face
-                # GameObjectType_Card (the spell being cast). Card is processed first,
-                # so we must override: back-face IDs are not in Scryfall.
-                real_card_ids.discard(grp_id)
+                real_cards.pop(grp_id, None)
                 special_objects[grp_id] = inst_data
-            elif grp_id not in real_card_ids:
+            elif grp_id not in real_cards:
                 special_objects.setdefault(grp_id, inst_data)
 
         for action in match_data.actions:
             cid = action.get("card_grp_id")
             if cid and cid not in special_objects:
-                real_card_ids.add(cid)
+                real_cards.setdefault(cid, {})
 
-        return real_card_ids, special_objects
+        return real_cards, special_objects
 
     def _ensure_cards(
         self,
-        real_card_ids: set[int],
+        real_cards: dict[int, dict],
         special_objects: dict[int, dict],
         scryfall,
         match=None,
         deck=None,
     ):
         """Ensure cards/objects exist in the database."""
-        all_ids = real_card_ids | set(special_objects)
+        all_ids = set(real_cards) | set(special_objects)
         if not all_ids:
             return
 
-        existing_ids = set(Card.objects.filter(grp_id__in=all_ids).values_list("grp_id", flat=True))
-        missing_real = real_card_ids - existing_ids
+        existing_rows = Card.objects.filter(grp_id__in=all_ids).values("grp_id", "name")
+        existing_ids = {r["grp_id"] for r in existing_rows}
+        # Track existing entries that are bare "Unknown Card (N)" placeholders so we
+        # can upgrade them if we now have richer game-state data.
+        unknown_placeholder_ids = {
+            r["grp_id"] for r in existing_rows if r["name"].startswith("Unknown Card (")
+        }
+
+        missing_real = {gid: real_cards[gid] for gid in (set(real_cards) - existing_ids)}
         missing_special = {gid: d for gid, d in special_objects.items() if gid not in existing_ids}
+        upgradeable_real = {
+            gid: real_cards[gid] for gid in (set(real_cards) & unknown_placeholder_ids)
+        }
 
         # ── Real cards: Scryfall lookup, Unknown Card fallback ──
         if missing_real:
-            card_lookup = scryfall.lookup_cards_batch(missing_real)
+            card_lookup = scryfall.lookup_cards_batch(set(missing_real))
             cards_to_create = []
             unknown_cards_to_log = []
 
             for grp_id, card_data in card_lookup.items():
+                inst_data = missing_real[grp_id]
                 if card_data:
                     cards_to_create.append(
                         Card(
@@ -312,6 +328,11 @@ class Command(BaseCommand):
                         )
                     )
                 else:
+                    name = generate_unknown_card_description(grp_id, inst_data)
+                    type_line = build_type_line(inst_data) or None
+                    colors = inst_data.get("colors") or []
+                    power = inst_data.get("power")
+                    toughness = inst_data.get("toughness")
                     context_info = {
                         "grp_id": grp_id,
                         "import_session_id": self.import_session.id,
@@ -319,15 +340,27 @@ class Command(BaseCommand):
                         "deck_id": deck.deck_id if deck else None,
                         "deck_name": deck.name if deck else None,
                     }
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Unknown card: grp_id={grp_id}, "
-                            f"deck={deck.name if deck else 'N/A'}, "
-                            f"match={match.match_id[:8] if match else 'N/A'}"
+                    is_bare_unknown = name == f"Unknown Card ({grp_id})"
+                    if is_bare_unknown:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"Unknown card: grp_id={grp_id}, "
+                                f"deck={deck.name if deck else 'N/A'}, "
+                                f"match={match.match_id[:8] if match else 'N/A'}"
+                            )
+                        )
+                    cards_to_create.append(
+                        Card(
+                            grp_id=grp_id,
+                            name=name,
+                            type_line=type_line,
+                            colors=[_COLOR_LABELS.get(c, c) for c in colors] if colors else [],
+                            power=str(power) if power is not None else None,
+                            toughness=str(toughness) if toughness is not None else None,
                         )
                     )
-                    cards_to_create.append(Card(grp_id=grp_id, name=f"Unknown Card ({grp_id})"))
-                    unknown_cards_to_log.append((grp_id, context_info))
+                    if is_bare_unknown:
+                        unknown_cards_to_log.append((grp_id, context_info))
 
             if cards_to_create:
                 Card.objects.bulk_create(cards_to_create, ignore_conflicts=True)
@@ -350,6 +383,26 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.WARNING(f"Logged {len(unknown_records)} unknown cards for review")
                 )
+
+        # ── Upgrade existing bare "Unknown Card (N)" placeholders with better data ──
+        for grp_id, inst_data in upgradeable_real.items():
+            name = generate_unknown_card_description(grp_id, inst_data)
+            if name == f"Unknown Card ({grp_id})":
+                continue
+            type_line = build_type_line(inst_data) or None
+            colors = inst_data.get("colors") or []
+            power = inst_data.get("power")
+            toughness = inst_data.get("toughness")
+            Card.objects.filter(grp_id=grp_id, name=f"Unknown Card ({grp_id})").update(
+                name=name,
+                type_line=type_line,
+                colors=[_COLOR_LABELS.get(c, c) for c in colors] if colors else [],
+                power=str(power) if power is not None else None,
+                toughness=str(toughness) if toughness is not None else None,
+            )
+            # Mark resolved in UnknownCard table if an entry exists.
+            UnknownCard.objects.filter(card_id=grp_id, is_resolved=False).update(is_resolved=True)
+
 
         # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
         for grp_id, inst_data in missing_special.items():

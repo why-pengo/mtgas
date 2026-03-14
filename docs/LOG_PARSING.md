@@ -225,7 +225,7 @@ Extracted from `turnInfo` in game state messages:
 
 ### Card Objects
 
-Game objects contain card information. Every `gameObjects` entry is stored in `card_instances`, keyed by `instanceId`:
+Game objects contain card information. Every `gameObjects` entry is **merged** into `card_instances`, keyed by `instanceId`:
 
 ```python
 {
@@ -244,6 +244,8 @@ Game objects contain card information. Every `gameObjects` entry is stored in `c
     "zoneId": 28                # Zone the object currently occupies
 }
 ```
+
+> **Sparse-diff merging.** `GREMessageType_GameStateMessage` messages are often incremental *diffs* — a zone-change update may re-send an instance with only `zoneId` populated and all other fields empty (e.g. `cardTypes: []`). The parser therefore **merges** each incoming update with the existing entry rather than replacing it: an incoming field only overwrites the stored value when the new value is non-empty. This preserves `cardTypes`, `power`, `toughness`, etc. captured from the initial full state even after many subsequent diff messages for the same instance.
 
 #### Arena Game Object Types
 
@@ -339,9 +341,13 @@ Both import these shared symbols from `src/services/import_service.py`:
 
 ```python
 from src.services.import_service import (
-    _SKIP_OBJECT_TYPES,    # frozenset — engine objects to ignore entirely
-    _TOKEN_OBJECT_TYPES,   # frozenset — tokens/emblems to name from game state
-    generate_token_name,   # builds "1/1 Red Goblin Creature Token" etc.
+    _COLOR_LABELS,             # dict — Arena color enum → "W"/"U"/"B"/"R"/"G"
+    _SKIP_OBJECT_TYPES,        # frozenset — engine objects to ignore entirely
+    _TOKEN_OBJECT_TYPES,       # frozenset — tokens/emblems to name from game state
+    build_type_line,           # builds "Legendary Creature — Human Wizard" from game state
+    format_mana_cost,          # formats mana cost list to "{2}{U}{U}" string
+    generate_token_name,       # builds "1/1 Red Goblin Creature Token" etc.
+    generate_unknown_card_description,  # builds descriptive placeholder names
 )
 ```
 
@@ -349,7 +355,7 @@ from src.services.import_service import (
 
 Separates game object IDs into two buckets:
 
-- **`real_cards`** (`Dict[int, dict]`) — `GameObjectType_Card`, deck card IDs, and action card IDs → looked up in Scryfall. The dict maps `grp_id` to the richest `card_instances` entry seen for that grpId (containing `card_types`, `subtypes`, `super_types`, `colors`, `power`, `toughness`). Deck-only cards (no game instance) get an empty dict as their value.
+- **`real_cards`** (`Dict[int, dict]`) — `GameObjectType_Card`, deck card IDs, and action card IDs → looked up in Scryfall. The dict maps `grp_id` to the richest `card_instances` entry seen for that grpId (containing `card_types`, `subtypes`, `super_types`, `colors`, `power`, `toughness`). Deck-only cards (no game instance) get an empty dict as their value. When multiple instances share a grpId, the entry with non-empty `card_types` wins.
 - **`special_objects`** (`Dict[int, dict]`) — tokens, emblems, adventure faces, MDFC backs, room halves, Omens → handled without Scryfall (or with graceful fallback).
 
 Object types in `_SKIP_OBJECT_TYPES` (`TriggerHolder`, `Ability`, `RevealedCard`) are discarded and never added to either set.
@@ -372,6 +378,8 @@ no game-state data (deck-only card never seen in play)
 ```
 
 `type_line`, `colors`, `power`, `toughness`, and `mana_cost` are populated from game-state data even for unknown cards. Mana cost is sourced from `_collect_cast_mana_costs()`, which scans `ActionType_Cast` actions for matching grpIds.
+
+**Placeholder upgrade.** If a card was previously stored as `"Unknown Card (N)"` (e.g. it appeared in an earlier match's deck list but was never played), and the current match now provides game-state type/power data for the same grpId, `_ensure_cards` will **UPDATE** the existing row with the richer placeholder name and field values. This handles the common scenario where a card sits unplayed in one game and is seen on the battlefield in the next.
 
 To resolve existing `"Unknown Card (N)"` entries after a fresh Scryfall download, run:
 

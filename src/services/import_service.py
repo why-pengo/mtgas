@@ -420,12 +420,23 @@ class DataImportService:
 
         placeholders = ",".join("?" * len(all_ids))
         cursor = self.db.execute(
-            f"SELECT grp_id FROM cards WHERE grp_id IN ({placeholders})", tuple(all_ids)
+            f"SELECT grp_id, name FROM cards WHERE grp_id IN ({placeholders})", tuple(all_ids)
         )
-        existing_ids = {row["grp_id"] for row in cursor.fetchall()}
+        rows = cursor.fetchall()
+        existing_ids = {row["grp_id"] for row in rows}
+        # Track which existing cards are still unknown placeholders so we can
+        # upgrade them if we have richer game-state data in this match.
+        unknown_placeholder_ids = {
+            row["grp_id"] for row in rows if row["name"].startswith("Unknown Card (")
+        }
 
         missing_real = {gid: real_cards[gid] for gid in (set(real_cards) - existing_ids)}
         missing_special = {gid: d for gid, d in special_objects.items() if gid not in existing_ids}
+        # Real cards that were stored as bare placeholders and may now have better data.
+        upgradeable_real = {
+            gid: real_cards[gid]
+            for gid in (set(real_cards) & unknown_placeholder_ids)
+        }
 
         if missing_real or missing_special:
             logger.info(
@@ -480,6 +491,30 @@ class DataImportService:
                 """,
                     (grp_id, name, type_line, color_json, power, toughness, mana_cost_str),
                 )
+
+        # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
+        # ── Upgrade existing "Unknown Card" placeholders with better game-state data ──
+        for grp_id, inst_data in upgradeable_real.items():
+            mana_cost_json = cast_mana_costs.get(grp_id)
+            name = generate_unknown_card_description(grp_id, inst_data, mana_cost_json)
+            # Only update if we have a more informative name than the bare placeholder
+            if name == f"Unknown Card ({grp_id})":
+                continue
+            type_line = build_type_line(inst_data) or None
+            colors = inst_data.get("colors") or []
+            color_json = json.dumps([_COLOR_LABELS.get(c, c) for c in colors] if colors else [])
+            power = inst_data.get("power")
+            toughness = inst_data.get("toughness")
+            mana_cost_str = format_mana_cost(mana_cost_json) if mana_cost_json else None
+            logger.debug(f"Upgrading placeholder grp_id={grp_id} to '{name}'")
+            self.db.execute(
+                """
+                UPDATE cards
+                SET name = ?, type_line = ?, colors = ?, power = ?, toughness = ?, mana_cost = ?
+                WHERE grp_id = ? AND name = ?
+            """,
+                (name, type_line, color_json, power, toughness, mana_cost_str, grp_id, f"Unknown Card ({grp_id})"),
+            )
 
         # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
         for grp_id, inst_data in missing_special.items():

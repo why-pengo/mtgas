@@ -396,11 +396,14 @@ class MTGALogParser:
                 )
 
         # Extract game objects (cards)
+        # Game state messages are often diffs — later updates may omit fields that
+        # were present in the initial full state (e.g., cardTypes becomes [] after
+        # a zone change).  Merge each update so earlier richer data is not lost.
         game_objects = game_state.get("gameObjects", [])
         for obj in game_objects:
             instance_id = obj.get("instanceId")
             if instance_id is not None:
-                self.current_match.card_instances[instance_id] = {
+                incoming = {
                     "grp_id": obj.get("grpId"),
                     "name": obj.get("name"),
                     "type": obj.get("type"),
@@ -415,6 +418,16 @@ class MTGALogParser:
                     "source_grp_id": obj.get("objectSourceGrpId"),
                     "zone_id": obj.get("zoneId"),
                 }
+                existing = self.current_match.card_instances.get(instance_id)
+                if existing:
+                    # Merge: keep existing non-empty values when the new update is sparse.
+                    merged = dict(existing)
+                    for key, val in incoming.items():
+                        if val or not existing.get(key):
+                            merged[key] = val
+                    self.current_match.card_instances[instance_id] = merged
+                else:
+                    self.current_match.card_instances[instance_id] = incoming
 
         # Extract actions
         actions = game_state.get("actions", [])
