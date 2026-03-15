@@ -449,20 +449,6 @@ html[data-theme="light"] .navbar-toggler {
     border-color: rgb(0 0 0 / 20%);
 }
 
-html[data-theme="light"] pre.bg-dark {
-    background-color: #e9ecef !important;
-    color: #212529 !important;
-}
-
-html[data-theme="light"] pre.bg-dark code {
-    color: #212529;
-}
-
-html[data-theme="light"] .bg-black {
-    background-color: #e9ecef !important;
-    color: #212529 !important;
-}
-
 /* =============================================================================
    Unknown Card Fix View
    ============================================================================= */
@@ -489,6 +475,20 @@ html[data-theme="light"] .raw-data-sample {
 }
 
 html[data-theme="light"] .raw-data-sample code {
+    color: #212529 !important;
+}
+
+html[data-theme="light"] pre.bg-dark {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
+}
+
+html[data-theme="light"] pre.bg-dark code {
+    color: #212529;
+}
+
+html[data-theme="light"] .bg-black {
+    background-color: #e9ecef !important;
     color: #212529 !important;
 }
 
@@ -564,4 +564,77 @@ html[data-theme="light"] .json-toggle:hover {
 
 .json-collapsible-content.json-collapsed {
     display: none;
+}
+
+/* ── Deck History ── */
+.deck-history-timeline .card-header {
+    font-size: 0.9rem;
+}
+
+.deck-history-changed > .card-header {
+    border-left: 3px solid var(--bs-warning);
+}
+
+.deck-diff-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    padding: 1px 0;
+}
+
+.deck-diff-added {
+    color: #4caf6c;
+}
+
+.deck-diff-removed {
+    color: #e05a5a;
+}
+
+.deck-diff-changed {
+    color: #e8a838;
+}
+
+html[data-theme="light"] .deck-diff-added  { color: #1a7a3d; }
+html[data-theme="light"] .deck-diff-removed { color: #b71c1c; }
+html[data-theme="light"] .deck-diff-changed  { color: #a66000; }
+
+.deck-diff-qty {
+    font-weight: 600;
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+.deck-card-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    padding: 1px 0;
+}
+
+.deck-card-qty {
+    font-weight: 600;
+    min-width: 2.5rem;
+    text-align: right;
+    color: #aaa;
+}
+
+/* Dashboard deck-changed badge */
+.deck-changed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: rgb(255 193 7 / 15%);
+    color: #e8a838;
+    border: 1px solid rgb(255 193 7 / 30%);
+    white-space: nowrap;
+}
+
+html[data-theme="light"] .deck-changed-badge {
+    color: #a66000;
+    background: rgb(255 193 7 / 10%);
 }

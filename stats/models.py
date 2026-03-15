@@ -52,7 +52,7 @@ class Card(models.Model):
 
 
 class Deck(models.Model):
-    """Stores information about each deck."""
+    """Deck identity anchor. Card composition is stored per-match in DeckSnapshot."""
 
     deck_id = models.CharField(max_length=100, unique=True, help_text="UUID from MTG Arena")
     name = models.CharField(max_length=255)
@@ -67,29 +67,17 @@ class Deck(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    def latest_snapshot(self) -> DeckSnapshot | None:
+        return self.snapshots.order_by("-created_at").select_related("match").first()
+
     def total_cards(self) -> int:
-        return sum(dc.quantity for dc in self.deck_cards.filter(is_sideboard=False))
+        snap = self.latest_snapshot()
+        return snap.total_cards() if snap else 0
 
     def win_rate(self) -> float:
         games = self.matches.filter(result__isnull=False).count()
         wins = self.matches.filter(result="win").count()
         return round(wins / games * 100, 1) if games > 0 else 0
-
-
-class DeckCard(models.Model):
-    """Cards in a deck."""
-
-    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="deck_cards")
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, db_column="card_grp_id")
-    quantity = models.IntegerField(default=1)
-    is_sideboard = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = "deck_cards"
-        unique_together = ("deck", "card", "is_sideboard")
-
-    def __str__(self) -> str:
-        return f"{self.quantity}x {self.card.name}"
 
 
 class Match(models.Model):
@@ -166,6 +154,50 @@ class Match(models.Model):
         mins = self.duration_seconds // 60
         secs = self.duration_seconds % 60
         return f"{mins}m {secs}s"
+
+
+class DeckSnapshot(models.Model):
+    """Records the exact deck composition used in a specific match."""
+
+    deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="snapshots")
+    match = models.OneToOneField(
+        Match,
+        on_delete=models.CASCADE,
+        related_name="deck_snapshot",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "deck_snapshots"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.deck.name} #{self.pk or '?'}"
+
+    def total_cards(self) -> int:
+        return sum(c.quantity for c in self.cards.filter(is_sideboard=False))
+
+    def sideboard_count(self) -> int:
+        return sum(c.quantity for c in self.cards.filter(is_sideboard=True))
+
+
+class DeckCard(models.Model):
+    """Cards in a specific deck snapshot (mainboard and sideboard)."""
+
+    snapshot = models.ForeignKey(DeckSnapshot, on_delete=models.CASCADE, related_name="cards")
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, db_column="card_grp_id")
+    quantity = models.IntegerField(default=1)
+    is_sideboard = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "deck_cards"
+        unique_together = ("snapshot", "card", "is_sideboard")
+
+    def __str__(self) -> str:
+        zone = "SB" if self.is_sideboard else "MB"
+        return f"{self.quantity}x {self.card.name} [{zone}]"
 
 
 class GameAction(models.Model):

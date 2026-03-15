@@ -128,7 +128,16 @@
                                 </a>
                             </td>
                             <td>{{ match.opponent_name|default:"Unknown" }}</td>
-                            <td>{{ match.deck.name|default:"Unknown" }}</td>
+                            <td>
+                                {% if match.deck %}
+                                <a href="{% url 'stats:deck_detail' match.deck.id %}">{{ match.deck.name }}</a>
+                                {% if match.deck_changed %}
+                                <span class="deck-changed-badge ms-1" title="Deck was modified before this match">
+                                    ✎ changed
+                                </span>
+                                {% endif %}
+                                {% else %}Unknown{% endif %}
+                            </td>
                             <td>{{ match.total_turns|default:"-" }}</td>
                         </tr>
                         {% endfor %}

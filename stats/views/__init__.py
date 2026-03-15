@@ -7,7 +7,7 @@ Re-exports all 13 URL-facing views so that urls.py can continue to use
 
 from .cards import unknown_card_fix, unknown_cards_list
 from .dashboard import api_stats, dashboard
-from .decks import deck_detail, deck_gallery, decks_list
+from .decks import deck_detail, deck_gallery, deck_history, decks_list
 from .imports import card_data, import_log, import_sessions
 from .matches import match_detail, match_replay, matches_list
 
@@ -20,6 +20,7 @@ __all__ = [
     "decks_list",
     "deck_detail",
     "deck_gallery",
+    "deck_history",
     "import_log",
     "import_sessions",
     "card_data",

@@ -23,6 +23,12 @@
             Fix {{ unknown_cards_count }} Unknown Card{{ unknown_cards_count|pluralize }}
         </a>
         {% endif %}
+        <a href="{% url 'stats:deck_history' deck.id %}" class="btn btn-outline-secondary">
+            History
+            {% if version_count > 1 %}
+            <span class="badge bg-secondary ms-1">{{ version_count }}</span>
+            {% endif %}
+        </a>
         <a href="{% url 'stats:deck_gallery' deck.id %}" class="btn btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-images" viewBox="0 0 16 16">
               <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>

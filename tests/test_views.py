@@ -26,7 +26,7 @@ def client():
 @pytest.fixture
 def sample_data(db):
     """Create sample data for view tests."""
-    from stats.models import Card, Deck, DeckCard, Match
+    from stats.models import Card, Deck, DeckCard, DeckSnapshot, Match
 
     # Create cards
     card = Card.objects.create(
@@ -40,7 +40,8 @@ def sample_data(db):
 
     # Create deck
     deck = Deck.objects.create(deck_id="test-deck-123", name="Red Deck Wins", format="Standard")
-    DeckCard.objects.create(deck=deck, card=card, quantity=4)
+    snapshot = DeckSnapshot.objects.create(deck=deck)
+    DeckCard.objects.create(snapshot=snapshot, card=card, quantity=4)
 
     # Create matches
     now = timezone.now()

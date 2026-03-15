@@ -137,7 +137,8 @@ Both the player's and opponent's life changes are captured by the parser and sto
 ## Data Limitations
 
 - **`turn_number = 0`** on some events: Resolved by the parser now tracking the last-seen turn number and applying it to subsequent messages that lack `turnInfo`. Opening-hand reveals and similar pre-game transfers may still show turn 0 as expected.
-- **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as `"Unknown Card (N)"`. Run `make download-cards` to populate the cache. Note that tokens and other non-card game objects are **not** looked up in Scryfall — they are stored with generated names (see *Import Service: Card Classification* above).
+- **Unknown cards**: Cards with `grp_id` values not present in the local Scryfall cache show as `"Unknown Card (N)"`. Run `make download-cards` to populate the cache, then `python manage.py resolve_unknown_cards` to upgrade any existing placeholders. Note that tokens and other non-card game objects are **not** looked up in Scryfall — they are stored with generated names (see *Import Service: Card Classification* in `LOG_PARSING.md`).
+- **Deck evolution between matches**: The deck shown in the timeline panel reflects the `DeckSnapshot` for that specific match — cards added or removed between sessions are tracked per match. See `stats/deck_diff.py` and the deck history UI (`/deck/<id>/history/`).
 - **Omen back-face cards**: Tarkir Dragonstorm Omen sorceries/instants (e.g. *Roost Seek*) have Arena grpIds not directly in Scryfall. The import service resolves their name from the paired front-face card (`grpId - 1`) and stores `source_grp_id` pointing to that front face. They display in the replay with their resolved name and are **not** flagged as tokens — zone transfer events (cast, resolve, etc.) show normally.
 - **Opponent's cards**: Cards played from the opponent's hand only become known when they enter the battlefield. Prior to that they appear as anonymous transfers.
 
@@ -147,14 +148,15 @@ Both the player's and opponent's life changes are captured by the parser and sto
 
 | Location | Purpose |
 |----------|---------|
-| `stats/views.py` — `_build_zone_labels()` | Infers zone roles from transfer statistics |
-| `stats/views.py` — `_zone_verb()` | Maps zone-pair transitions to event verbs |
-| `stats/views.py` — `match_replay()` | View: builds step list, serialises to JSON; handles `TokenCreated` category |
-| `stats/views.py` — `match_detail()` | Timeline view; handles `TokenCreated` category |
+| `stats/views/matches.py` — `_build_zone_labels()` | Infers zone roles from transfer statistics |
+| `stats/views/matches.py` — `_zone_verb()` | Maps zone-pair transitions to event verbs |
+| `stats/views/matches.py` — `match_replay()` | View: builds step list, serialises to JSON; handles `TokenCreated` category |
+| `stats/views/matches.py` — `match_detail()` | Timeline view; uses `match.deck_snapshot.cards` for the deck panel; handles `TokenCreated` category |
 | `stats/templates/match_replay.html` | Template: JS step-through UI with TOKEN badge |
 | `src/parser/log_parser.py` — `_process_game_state_message()` | Parser: extracts `AnnotationType_ZoneTransfer`; emits synthetic entries for `AnnotationType_TokenCreated` |
 | `stats/models.py` — `ZoneTransfer` | ORM model for zone transfer records (`category` field carries `"TokenCreated"` for synthetic entries) |
 | `stats/models.py` — `Card` | `is_token`, `object_type`, `source_grp_id` fields identify token/non-card game objects |
+| `stats/models.py` — `DeckSnapshot` | Per-match deck composition; `match_detail` reads cards from `match.deck_snapshot.cards` |
 | `src/services/import_service.py` — `_collect_card_ids()` | Splits game object IDs into real cards vs. special objects; `GameObjectType_Omen` override discards prior Card classification |
 | `src/services/import_service.py` — `_generate_token_name()` | Builds human-readable token names from game-state data |
 | `src/services/import_service.py` — `_ensure_cards()` Omen path | Resolves Omen back-face name via `grpId - 1` front-face lookup |

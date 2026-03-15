@@ -104,7 +104,7 @@ These contain detailed game state updates including turns, actions, and card inf
 
 #### 3. Deck Events
 
-Deck information appears in `EventSetDeckV2` or `CourseDeck` events:
+Deck information appears in `EventSetDeckV2` or `CourseDeck` events. Both the mainboard (`MainDeck`) and sideboard (`SideDeck`) arrays are captured:
 
 ```json
 {
@@ -119,10 +119,15 @@ Deck information appears in `EventSetDeckV2` or `CourseDeck` events:
     "MainDeck": [
       {"cardId": 12345, "quantity": 4},
       {"cardId": 12346, "quantity": 3}
+    ],
+    "SideDeck": [
+      {"cardId": 12350, "quantity": 2}
     ]
   }
 }
 ```
+
+The parsed data is stored in `MatchData.deck_cards` (mainboard) and `MatchData.deck_sideboard` (sideboard). Both lists are persisted into a `DeckSnapshot` tied to the match (see *Import Service: Deck Versioning* below).
 
 ## Parsing Process
 
@@ -335,7 +340,7 @@ There are two import paths; both implement the same classification logic and sha
 | Import path | Entry point |
 |---|---|
 | CLI (`make import-log`) | `stats/management/commands/import_log.py` |
-| Web UI (`/import/`) | `stats/views.py` |
+| Web UI (`/import/`) | `stats/views/imports.py` |
 
 Both import these shared symbols from `src/services/import_service.py`:
 
@@ -345,11 +350,28 @@ from src.services.import_service import (
     _SKIP_OBJECT_TYPES,        # frozenset — engine objects to ignore entirely
     _TOKEN_OBJECT_TYPES,       # frozenset — tokens/emblems to name from game state
     build_type_line,           # builds "Legendary Creature — Human Wizard" from game state
-    format_mana_cost,          # formats mana cost list to "{2}{U}{U}" string
     generate_token_name,       # builds "1/1 Red Goblin Creature Token" etc.
     generate_unknown_card_description,  # builds descriptive placeholder names
 )
 ```
+
+## Import Service: Deck Versioning
+
+Each import creates a `DeckSnapshot` tied to the match being imported. This records the exact deck composition (mainboard + sideboard) at the time of the match, enabling full deck history.
+
+### Order of operations in `_ensure_deck_snapshot()`
+
+1. `Deck.objects.get_or_create(deck_id=...)` — create (or fetch) the deck identity anchor.
+2. `Match.objects.create(...)` — create the match record.
+3. `DeckSnapshot.objects.create(deck=deck, match=match)` — create the snapshot.
+4. `_ensure_cards(real_cards, special_objects)` — always called for every card in the snapshot, even if the deck was seen before. This guarantees newly added cards are resolved against Scryfall on every import, not just the first.
+5. `DeckCard.objects.bulk_create([...])` — insert mainboard rows (`is_sideboard=False`) then sideboard rows (`is_sideboard=True`).
+
+### Deck diff utility
+
+`stats/deck_diff.py` provides `compute_deck_diff(snap_before, snap_after) → DeckDiff` used by the deck history UI. It computes added/removed/changed/unchanged cards per zone (mainboard and sideboard) between two snapshots.
+
+The deck history page (`/deck/<id>/history/`) and the dashboard "deck changed" badge both rely on this diff.
 
 ### `_collect_card_ids(match_data)`
 

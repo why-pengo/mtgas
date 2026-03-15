@@ -434,8 +434,7 @@ class DataImportService:
         missing_special = {gid: d for gid, d in special_objects.items() if gid not in existing_ids}
         # Real cards that were stored as bare placeholders and may now have better data.
         upgradeable_real = {
-            gid: real_cards[gid]
-            for gid in (set(real_cards) & unknown_placeholder_ids)
+            gid: real_cards[gid] for gid in (set(real_cards) & unknown_placeholder_ids)
         }
 
         if missing_real or missing_special:
@@ -513,7 +512,16 @@ class DataImportService:
                 SET name = ?, type_line = ?, colors = ?, power = ?, toughness = ?, mana_cost = ?
                 WHERE grp_id = ? AND name = ?
             """,
-                (name, type_line, color_json, power, toughness, mana_cost_str, grp_id, f"Unknown Card ({grp_id})"),
+                (
+                    name,
+                    type_line,
+                    color_json,
+                    power,
+                    toughness,
+                    mana_cost_str,
+                    grp_id,
+                    f"Unknown Card ({grp_id})",
+                ),
             )
 
         # ── Special objects: tokens/emblems get generated names; others try Scryfall ──

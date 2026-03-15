@@ -142,12 +142,14 @@ def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
             }
         )
 
-    # Get deck cards
+    # Get deck cards from this match's specific snapshot
     deck_cards = []
-    if match.deck:
-        deck_cards = match.deck.deck_cards.select_related("card").order_by(
-            "card__cmc", "card__name"
-        )
+    try:
+        snapshot = match.deck_snapshot
+        if snapshot:
+            deck_cards = snapshot.cards.select_related("card").order_by("card__cmc", "card__name")
+    except Exception:
+        pass
 
     return render(
         request,

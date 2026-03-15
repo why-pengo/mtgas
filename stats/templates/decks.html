@@ -45,6 +45,9 @@
                         <a href="{% url 'stats:deck_gallery' deck.id %}" class="btn btn-sm btn-outline-primary" title="View Card Gallery">
                             <i class="bi bi-images"></i> Gallery
                         </a>
+                        <a href="{% url 'stats:deck_history' deck.id %}" class="btn btn-sm btn-outline-secondary" title="Deck History">
+                            History{% if deck.version_count > 1 %} <span class="badge bg-secondary">{{ deck.version_count }}</span>{% endif %}
+                        </a>
                     </td>
                 </tr>
                 {% empty %}

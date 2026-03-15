@@ -36,10 +36,11 @@ def sample_card(db):
 @pytest.fixture
 def sample_deck(db, sample_card):
     """Create a sample deck for testing."""
-    from stats.models import Deck, DeckCard
+    from stats.models import Deck, DeckCard, DeckSnapshot
 
     deck = Deck.objects.create(deck_id="deck-uuid-123", name="Red Aggro", format="Standard")
-    DeckCard.objects.create(deck=deck, card=sample_card, quantity=4)
+    snapshot = DeckSnapshot.objects.create(deck=deck)
+    DeckCard.objects.create(snapshot=snapshot, card=sample_card, quantity=4)
     return deck
 
 
@@ -132,14 +133,14 @@ class TestDeckModel:
 
     def test_deck_creation(self, sample_card):
         """Test deck creation with cards."""
-        from stats.models import Deck, DeckCard
+        from stats.models import Deck, DeckCard, DeckSnapshot
 
         deck = Deck.objects.create(deck_id="new-deck-123", name="Control Deck", format="Historic")
-
-        DeckCard.objects.create(deck=deck, card=sample_card, quantity=4)
+        snapshot = DeckSnapshot.objects.create(deck=deck)
+        DeckCard.objects.create(snapshot=snapshot, card=sample_card, quantity=4)
 
         assert deck.name == "Control Deck"
-        assert deck.deck_cards.count() == 1
+        assert snapshot.cards.count() == 1
         assert deck.total_cards() == 4
 
     def test_deck_win_rate_no_matches(self, sample_deck):

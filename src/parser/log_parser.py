@@ -46,6 +46,7 @@ class MatchData:
     deck_name: Optional[str] = None
     deck_id: Optional[str] = None
     deck_cards: List[Dict] = field(default_factory=list)
+    deck_sideboard: List[Dict] = field(default_factory=list)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     result: Optional[str] = None  # 'win', 'loss', 'draw'
@@ -544,6 +545,8 @@ class MTGALogParser:
         if deck_data:
             main_deck = deck_data.get("MainDeck", [])
             self.current_match.deck_cards = main_deck
+            side_deck = deck_data.get("SideDeck", [])
+            self.current_match.deck_sideboard = side_deck
 
 
 def parse_log_file(log_path: str) -> List[MatchData]:

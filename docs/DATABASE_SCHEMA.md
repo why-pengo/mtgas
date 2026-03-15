@@ -4,47 +4,52 @@ This document describes the database schema used by the MTG Arena Statistics Tra
 
 ## Overview
 
-The database uses SQLite (via Django ORM) and consists of 7 main tables that track matches, decks, cards, and game events.
+The database uses SQLite (via Django ORM) and consists of 9 main tables that track matches, decks, cards, and game events.
 
 ## Entity Relationship Diagram
 
 ```
-┌──────────────────┐       ┌─────────────┐       ┌─────────────┐
-│      cards       │       │    decks    │       │   matches   │
-├──────────────────┤       ├─────────────┤       ├─────────────┤
-│ grp_id (PK)      │◄──────│ id (PK)     │◄──────│ id (PK)     │
-│ name             │       │ deck_id     │       │ match_id    │
-│ mana_cost        │       │ name        │       │ deck_id(FK) │
-│ cmc              │       │ format      │       │ result      │
-│ type_line        │       │ created_at  │       │ opponent    │
-│ colors           │       └─────────────┘       │ start_time  │
-│ rarity           │              │              │ duration    │
-│ is_token         │              │              └─────────────┘
-│ object_type      │              │                     │
-│ source_grp_id    │              ▼                     │
-└──────────────────┘       ┌─────────────┐             │
-        ▲                  │ deck_cards  │             │
-        │                  ├─────────────┤             │
-        └──────────────────│ deck_id(FK) │             │
-                           │ card_grp_id │             │
-                           │ quantity    │             │
-                           └─────────────┘             │
-                                                       │
-        ┌──────────────────────────────────────────────┼──────────────────────┐
-        │                                              │                      │
-        ▼                                              ▼                      ▼
-┌─────────────┐                              ┌─────────────┐         ┌──────────────┐
-│game_actions │                              │life_changes │         │zone_transfers│
-├─────────────┤                              ├─────────────┤         ├──────────────┤
-│ id (PK)     │                              │ id (PK)     │         │ id (PK)      │
-│ match_id(FK)│                              │ match_id(FK)│         │ match_id(FK) │
-│ turn_number │                              │ turn_number │         │ turn_number  │
-│ action_type │                              │ seat_id     │         │ instance_id  │
-│ card_grp_id │                              │ life_total  │         │ card_grp_id  │
-│ mana_cost   │                              │ change_amt  │         │ from_zone    │
-└─────────────┘                              └─────────────┘         │ to_zone      │
-                                                                     │ category     │
-                                                                     └──────────────┘
+┌──────────────────┐       ┌──────────────────┐       ┌─────────────────┐
+│      cards       │       │      decks        │       │     matches     │
+├──────────────────┤       ├──────────────────┤       ├─────────────────┤
+│ grp_id (PK)      │       │ id (PK)           │◄──────│ id (PK)         │
+│ name             │       │ deck_id (unique)  │       │ match_id        │
+│ mana_cost        │       │ name              │       │ deck_id (FK)    │
+│ cmc              │       │ format            │       │ result          │
+│ type_line        │       │ created_at        │       │ opponent        │
+│ colors           │       └──────────────────┘       │ start_time      │
+│ rarity           │               │                  │ duration        │
+│ is_token         │               │ (1:many)         └─────────────────┘
+│ object_type      │               ▼                           │
+│ source_grp_id    │       ┌──────────────────┐               │ (1:1)
+└──────────────────┘       │  deck_snapshots  │◄──────────────┘
+        ▲                  ├──────────────────┤
+        │                  │ id (PK)          │
+        │                  │ deck_id (FK)     │
+        │                  │ match_id (1:1 FK)│
+        │                  │ created_at       │
+        │                  └──────────────────┘
+        │                           │
+        │                           │ (1:many)
+        │                           ▼
+        │                  ┌──────────────────┐
+        └──────────────────│   deck_cards     │
+                           ├──────────────────┤
+                           │ snapshot_id (FK) │
+                           │ card_grp_id (FK) │
+                           │ quantity         │
+                           │ is_sideboard     │
+                           └──────────────────┘
+
+        ┌──────────────────────────────────────────────────────────────────┐
+        │                          matches                                 │
+        └────────────┬─────────────────────────────────────┬──────────────┘
+                     │                                     │
+                     ▼                                     ▼
+          ┌─────────────────────┐               ┌──────────────────────┐
+          │    game_actions     │               │    life_changes /    │
+          │    zone_transfers   │               │    zone_transfers    │
+          └─────────────────────┘               └──────────────────────┘
 ```
 
 ## Tables
@@ -94,7 +99,7 @@ System objects (`GameObjectType_TriggerHolder`, `GameObjectType_Ability`, `GameO
 
 ### 2. decks
 
-Stores deck information.
+Stores deck identity. A deck is the **anchor** for all versions of the same Arena deck UUID — actual card composition is stored per-match in `deck_snapshots`.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -108,24 +113,40 @@ Stores deck information.
 
 **Index:** Unique index on `deck_id`
 
-### 3. deck_cards
+### 3. deck_snapshots
 
-Junction table for cards in decks.
+Records the exact deck composition used for a specific match. A new snapshot is created on every import, even if the cards have not changed, enabling full deck history.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER (PK) | Auto-increment ID |
-| `deck_id` | INTEGER (FK) | Reference to decks.id |
-| `card_grp_id` | INTEGER (FK) | Reference to cards.grp_id |
-| `quantity` | INTEGER | Number of copies (1-4 typically) |
-| `is_sideboard` | BOOLEAN | True if sideboard card |
+| `deck_id` | INTEGER (FK) | Reference to decks.id (CASCADE delete) |
+| `match_id` | INTEGER (FK, unique) | OneToOne reference to matches.id (CASCADE delete); nullable |
+| `created_at` | DATETIME | Snapshot creation timestamp |
 
-**Constraints:** 
+**Constraints:**
 - Foreign key to `decks(id)` with CASCADE delete
-- Foreign key to `cards(grp_id)`
-- Unique constraint on (deck_id, card_grp_id, is_sideboard)
+- Unique (one snapshot per match)
+- `match_id` is nullable (test fixtures may omit it)
 
-### 4. matches
+### 4. deck_cards
+
+Cards in a specific deck snapshot (mainboard and sideboard). Each row belongs to a `DeckSnapshot`, not the `Deck` identity.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK) | Auto-increment ID |
+| `snapshot_id` | INTEGER (FK) | Reference to deck_snapshots.id (CASCADE delete) |
+| `card_grp_id` | INTEGER (FK) | Reference to cards.grp_id (CASCADE delete) |
+| `quantity` | INTEGER | Number of copies (1–4 typically) |
+| `is_sideboard` | BOOLEAN | True if sideboard card (default False) |
+
+**Constraints:**
+- Foreign key to `deck_snapshots(id)` with CASCADE delete
+- Foreign key to `cards(grp_id)`
+- Unique constraint on (snapshot_id, card_grp_id, is_sideboard)
+
+### 5. matches
 
 Stores match/game information.
 
@@ -161,7 +182,7 @@ Stores match/game information.
 - Index on `result`
 - Index on `opponent_name`
 
-### 5. game_actions
+### 6. game_actions
 
 Stores individual game actions (plays, casts, etc.).
 
@@ -187,7 +208,7 @@ Stores individual game actions (plays, casts, etc.).
 - Index on (match_id, turn_number)
 - Foreign key to `matches(id)` with CASCADE delete
 
-### 6. life_changes
+### 7. life_changes
 
 Tracks life total changes during games.
 
@@ -202,7 +223,7 @@ Tracks life total changes during games.
 | `change_amount` | INTEGER | Change from previous (+/-) |
 | `source_instance_id` | INTEGER | What caused the change |
 
-### 7. zone_transfers
+### 8. zone_transfers
 
 Tracks card movements between zones.
 
@@ -230,7 +251,7 @@ Tracks card movements between zones.
 
 Rows with `category = "TokenCreated"` are **synthetic** — they are generated by the parser from `AnnotationType_TokenCreated` annotations (which carry no zone information) using the token's zone from `card_instances`. They give the match timeline and replay a concrete event for token creation.
 
-### 8. import_sessions
+### 9. import_sessions
 
 Tracks log file import history.
 
@@ -249,12 +270,15 @@ Tracks log file import history.
 
 ## Key Relationships
 
-1. **Deck → Cards**: Many-to-many through `deck_cards`
-2. **Match → Deck**: Many-to-one (a match uses one deck)
-3. **Match → Actions**: One-to-many (cascade delete)
-4. **Match → Life Changes**: One-to-many (cascade delete)
-5. **Match → Zone Transfers**: One-to-many (cascade delete)
-6. **Actions/Transfers → Cards**: Many-to-one (for card details)
+1. **Deck → DeckSnapshots**: One-to-many (one deck identity, many versioned snapshots)
+2. **Match → DeckSnapshot**: One-to-one (each match has exactly one snapshot of the deck used)
+3. **DeckSnapshot → DeckCards**: One-to-many (snapshot holds mainboard + sideboard)
+4. **DeckCard → Card**: Many-to-one (card metadata)
+5. **Match → Deck**: Many-to-one FK for fast identity lookups (does not change when deck evolves)
+6. **Match → Actions**: One-to-many (cascade delete)
+7. **Match → Life Changes**: One-to-many (cascade delete)
+8. **Match → Zone Transfers**: One-to-many (cascade delete)
+9. **Actions/Transfers → Cards**: Many-to-one (for card details)
 
 ## Common Queries
 
@@ -289,6 +313,29 @@ WHERE ga.action_type = 'ActionType_Cast'
 GROUP BY c.grp_id
 ORDER BY times_played DESC
 LIMIT 20;
+```
+
+### Deck Version History (snapshots per deck)
+```sql
+SELECT d.name, COUNT(ds.id) as versions,
+       MIN(ds.created_at) as first_played,
+       MAX(ds.created_at) as last_played
+FROM decks d
+JOIN deck_snapshots ds ON ds.deck_id = d.id
+GROUP BY d.id
+ORDER BY versions DESC;
+```
+
+### Cards in a Specific Match's Deck (mainboard)
+```sql
+SELECT c.name, dc.quantity
+FROM deck_cards dc
+JOIN deck_snapshots ds ON dc.snapshot_id = ds.id
+JOIN cards c ON dc.card_grp_id = c.grp_id
+JOIN matches m ON ds.match_id = m.id
+WHERE m.match_id = '<arena-match-uuid>'
+  AND dc.is_sideboard = 0
+ORDER BY c.name;
 ```
 
 ### Tokens Created in a Match

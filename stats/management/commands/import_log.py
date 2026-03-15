@@ -25,7 +25,6 @@ from src.services.import_service import (  # noqa: E402
     _SKIP_OBJECT_TYPES,
     _TOKEN_OBJECT_TYPES,
     build_type_line,
-    format_mana_cost,
     generate_token_name,
     generate_unknown_card_description,
 )
@@ -34,6 +33,7 @@ from stats.models import (  # noqa: E402
     Card,
     Deck,
     DeckCard,
+    DeckSnapshot,
     GameAction,
     ImportSession,
     LifeChange,
@@ -142,19 +142,12 @@ class Command(BaseCommand):
     @transaction.atomic
     def _import_match(self, match_data: MatchData, scryfall):
         """Import a single match into the database."""
-        # Ensure deck exists
-        deck = None
-        if match_data.deck_id:
-            deck = self._ensure_deck(match_data, scryfall)
-
         # Calculate duration
         duration = None
         if match_data.start_time and match_data.end_time:
             duration = int((match_data.end_time - match_data.start_time).total_seconds())
 
         # Defensive check: ensure datetimes are timezone-aware
-        # Note: Parser now creates timezone-aware datetimes, but we keep this
-        # as a safety net in case of legacy data or future changes
         start_time = match_data.start_time
         end_time = match_data.end_time
         if start_time and start_time.tzinfo is None:
@@ -162,7 +155,18 @@ class Command(BaseCommand):
         if end_time and end_time.tzinfo is None:
             end_time = timezone.make_aware(end_time)
 
-        # Create match - use match_id as the tracking key
+        # Resolve deck identity (Deck row) — snapshot is created after match
+        deck = None
+        if match_data.deck_id:
+            deck, _ = Deck.objects.get_or_create(
+                deck_id=match_data.deck_id,
+                defaults={
+                    "name": match_data.deck_name or "Unknown Deck",
+                    "format": match_data.format,
+                },
+            )
+
+        # Create match
         match = Match.objects.create(
             match_id=match_data.match_id,
             game_number=1,
@@ -185,8 +189,11 @@ class Command(BaseCommand):
             total_turns=match_data.total_turns,
         )
 
+        # Create deck snapshot for this match (every match gets its own snapshot)
+        if deck and (match_data.deck_cards or match_data.deck_sideboard):
+            self._ensure_deck_snapshot(match_data, deck, match, scryfall)
+
         # Collect all unique card IDs and ensure they're in the cards table
-        # Pass match and deck for unknown card tracking
         real_cards, special_objects = self._collect_card_ids(match_data)
         self._ensure_cards(real_cards, special_objects, scryfall, match, deck)
 
@@ -201,36 +208,55 @@ class Command(BaseCommand):
 
         return match
 
-    def _ensure_deck(self, match_data: MatchData, scryfall) -> Deck:
-        """Ensure deck exists in database."""
-        deck, created = Deck.objects.get_or_create(
-            deck_id=match_data.deck_id,
-            defaults={
-                "name": match_data.deck_name or "Unknown Deck",
-                "format": match_data.format,
-            },
-        )
+    def _ensure_deck_snapshot(
+        self, match_data: MatchData, deck: Deck, match: Match, scryfall
+    ) -> DeckSnapshot:
+        """Create a DeckSnapshot for this match, ensuring all cards are in the DB."""
+        # Collect all card IDs from the current deck list (mainboard + sideboard)
+        all_deck_card_ids: dict[int, dict] = {}
+        for card in match_data.deck_cards + match_data.deck_sideboard:
+            cid = card.get("cardId")
+            if cid:
+                all_deck_card_ids.setdefault(cid, {})
 
-        if created and match_data.deck_cards:
-            # Ensure cards exist first - pass None for match since it doesn't exist yet
-            # Deck cards have no instance data at this stage, so use empty dicts.
-            card_ids_dict = {c["cardId"]: {} for c in match_data.deck_cards if c.get("cardId")}
-            self._ensure_cards(card_ids_dict, {}, scryfall, None, deck)
+        # Ensure every card in this snapshot exists in the cards table
+        if all_deck_card_ids:
+            self._ensure_cards(all_deck_card_ids, {}, scryfall, match, deck)
 
-            # Add deck cards
-            for card_data in match_data.deck_cards:
-                card_id = card_data.get("cardId")
-                quantity = card_data.get("quantity", 1)
-                if card_id:
-                    try:
-                        card = Card.objects.get(grp_id=card_id)
-                        DeckCard.objects.create(
-                            deck=deck, card=card, quantity=quantity, is_sideboard=False
+        # Create the snapshot
+        snapshot = DeckSnapshot.objects.create(deck=deck, match=match)
+
+        # Populate mainboard
+        snapshot_cards = []
+        for card_data in match_data.deck_cards:
+            card_id = card_data.get("cardId")
+            quantity = card_data.get("quantity", 1)
+            if card_id:
+                try:
+                    card = Card.objects.get(grp_id=card_id)
+                    snapshot_cards.append(
+                        DeckCard(
+                            snapshot=snapshot, card=card, quantity=quantity, is_sideboard=False
                         )
-                    except Card.DoesNotExist:
-                        pass
+                    )
+                except Card.DoesNotExist:
+                    pass
 
-        return deck
+        # Populate sideboard
+        for card_data in match_data.deck_sideboard:
+            card_id = card_data.get("cardId")
+            quantity = card_data.get("quantity", 1)
+            if card_id:
+                try:
+                    card = Card.objects.get(grp_id=card_id)
+                    snapshot_cards.append(
+                        DeckCard(snapshot=snapshot, card=card, quantity=quantity, is_sideboard=True)
+                    )
+                except Card.DoesNotExist:
+                    pass
+
+        DeckCard.objects.bulk_create(snapshot_cards, ignore_conflicts=True)
+        return snapshot
 
     def _collect_card_ids(self, match_data: MatchData) -> tuple[dict[int, dict], dict[int, dict]]:
         """Collect card IDs from match data.
@@ -402,7 +428,6 @@ class Command(BaseCommand):
             )
             # Mark resolved in UnknownCard table if an entry exists.
             UnknownCard.objects.filter(card_id=grp_id, is_resolved=False).update(is_resolved=True)
-
 
         # ── Special objects: tokens/emblems get generated names; others try Scryfall ──
         for grp_id, inst_data in missing_special.items():
