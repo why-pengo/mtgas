@@ -47,6 +47,22 @@ make format
 make format-check
 ```
 
+### CSS
+
+All styles must live in `stats/static/css/style.css`. **Do not** add `<style>` blocks to templates or `style="..."` inline attributes to HTML elements.
+
+```
+✅ <div class="my-component">      (class in style.css)
+❌ <div style="color: red">        (inline style)
+❌ {% block extra_css %}<style>…   (template style block)
+```
+
+**Exceptions** — these two cases are unavoidable and acceptable:
+1. **Django template variables**: `style="width: {{ value }}%"` when the value drives the style directly (e.g., progress bar fills). There is no CSS-only alternative.
+2. **JS-controlled initial state**: `style="display:none"` on elements whose visibility is toggled by JavaScript that reads/writes `element.style.*`. Changing these to class toggles requires coordinated JS changes.
+
+Run `make lint-css` (stylelint) to validate CSS. Use modern `rgb()` notation — `rgb(0 0 0 / 50%)` not `rgba(0, 0, 0, 0.5)`.
+
 ### Linting
 
 All code must pass **flake8** linting:

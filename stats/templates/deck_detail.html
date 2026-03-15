@@ -129,6 +129,7 @@
                 Deck List
                 <span class="badge bg-secondary float-end">{{ deck.format|default:"Unknown" }}</span>
                 <span class="badge bg-primary float-end me-1">{{ total_cards }} cards</span>
+                <a href="{% url 'stats:deck_history' deck.id %}" class="badge bg-dark float-end me-1 text-decoration-none">🕘 {{ version_count }} version{{ version_count|pluralize }}</a>
             </div>
             <div class="card-body">
                 {% for category, cards in cards_by_type.items %}

@@ -53,11 +53,11 @@ make ci          # Run check + test (use before commits)
    - `exceptions.py` - Custom exception types
 
 2. **`stats/`** - Django app (models, views, templates)
-   - `models.py` - ORM models (Match, Deck, Card, GameAction, etc.)
-   - `views.py` - Django views for dashboard and match details
+   - `models.py` - ORM models (Match, Deck, DeckSnapshot, Card, GameAction, etc.)
+   - `views/` - Django views split by domain (dashboard, decks, matches, imports)
    - `management/commands/` - CLI commands (import_log, download_cards)
    - `templates/` - Django templates
-   - `static/` - CSS and `js/charts.js` (D3.js visualizations)
+   - `static/` - CSS (`css/style.css`) and JS (`js/app.js`, `js/charts.js`)
 
 3. **`mtgas_project/`** - Django project configuration
    - `settings.py` - Django settings (INSTALLED_APPS, DATABASE, etc.)
@@ -97,19 +97,29 @@ make ci          # Run check + test (use before commits)
 
 ### Database Schema Key Relationships
 ```
-Match (1) ←──→ (1) Deck ←──→ (*) DeckCard (*) ←──→ (1) Card
+Match (1) ←──→ (1) DeckSnapshot ←──→ (*) DeckCard (*) ←──→ (1) Card
+  ↓                    ↓
+Deck (identity)    is_sideboard flag
   ↓ (1:*)
 GameAction
   ↓ (1:*)
 LifeChange, ZoneTransfer
 ```
 
-- Each `Match` references one `Deck` (via deck_id)
-- `Deck` has many `DeckCard` entries (card + quantity)
+- Each `Match` has one `DeckSnapshot` (exact cards played that match)
+- `Deck` is an identity anchor; `DeckSnapshot` stores the actual card list per match
+- `DeckCard` has `is_sideboard` flag; `snapshot_id` FK (not `deck_id`)
 - `GameAction` stores in-game events (indexed by match_id)
 - `LifeChange` and `ZoneTransfer` track detailed game state
 
 ## Coding Conventions
+
+### CSS Conventions
+- **All styles in `stats/static/css/style.css`** — no `<style>` blocks in templates, no `style="..."` inline attributes
+- Run `make lint-css` (stylelint) to validate; use modern `rgb()` notation: `rgb(0 0 0 / 50%)` not `rgba(0,0,0,0.5)`
+- **Allowed exceptions** (unavoidable):
+  - Django template variable widths: `style="width: {{ value }}%"` on progress bars
+  - JS-controlled initial state: `style="display:none"` on elements toggled by JavaScript
 
 ### Python Code Style
 - **Line length**: 100 characters (black and flake8 configured)
@@ -153,10 +163,10 @@ LifeChange, ZoneTransfer
 6. Add tests in `tests/test_models.py`
 
 ### Adding a New Chart
-1. Add data aggregation in `stats/views.py` (return JSON or context)
+1. Add data aggregation in `stats/views/dashboard.py` (return JSON or context)
 2. Create D3.js function in `stats/static/js/charts.js`
-3. Call function from template (e.g., `stats/templates/stats/dashboard.html`)
-4. Style in `stats/static/css/charts.css`
+3. Call function from template (e.g., `stats/templates/dashboard.html`)
+4. Style in `stats/static/css/style.css`
 
 ### Extending Log Parser
 1. Identify new event type in Player.log (use grep or search tools)

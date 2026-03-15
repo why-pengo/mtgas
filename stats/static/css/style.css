@@ -199,6 +199,16 @@ body {
 
 .card-item {
     background-color: black;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: zoom-in;
+}
+
+.card-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgb(0 0 0 / 20%);
 }
 
 /* =============================================================================
@@ -714,4 +724,288 @@ html[data-theme="light"] .deck-diff-changed  { color: #a66000; }
 html[data-theme="light"] .deck-changed-badge {
     color: #a66000;
     background: rgb(255 193 7 / 10%);
+}
+
+/* =============================================================================
+   Card Gallery
+   ============================================================================= */
+.card-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.card-image-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 139.5%; /* Magic card aspect ratio */
+    background: #e9ecef;
+}
+
+.card-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    padding: 10px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.card-quantity {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgb(0 0 0 / 80%);
+    color: white;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 10;
+}
+
+.category-section {
+    margin-bottom: 40px;
+}
+
+.category-title {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.cache-status {
+    margin-bottom: 20px;
+}
+
+/* Gallery cache progress bar (taller than the global .progress) */
+.cache-status .progress {
+    height: 25px;
+    font-size: 14px;
+}
+
+/* =============================================================================
+   Match Replay
+   ============================================================================= */
+.replay-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.replay-stage {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    min-height: 420px;
+}
+
+.replay-card-area {
+    flex: 0 0 242px;
+}
+
+#replayCardImg {
+    width: 242px;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 50%);
+    display: block;
+}
+
+.replay-card-placeholder {
+    width: 242px;
+    height: 338px;
+    border-radius: 10px;
+    background-color: var(--bg-header);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 2rem;
+}
+
+.replay-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.replay-turn-badge {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.replay-description {
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.3;
+    min-height: 3rem;
+}
+
+.replay-actor-you { color: #64b5f6; }
+
+.replay-actor-opp { color: #ffb74d; }
+
+.replay-token-badge {
+    display: inline-block;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: #4a3b00;
+    color: #ffd54f;
+    border: 1px solid #ffd54f;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.life-totals {
+    display: flex;
+    gap: 2rem;
+}
+
+.life-block {
+    text-align: center;
+    min-width: 80px;
+}
+
+.life-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.life-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.replay-progress {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.replay-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.replay-progress-bar-wrap {
+    height: 4px;
+    background-color: var(--bg-header);
+    border-radius: 2px;
+    margin: 0.5rem 0 1rem;
+}
+
+.replay-progress-bar-fill {
+    height: 100%;
+    background-color: var(--accent);
+    border-radius: 2px;
+    transition: width 0.2s ease;
+}
+
+.replay-no-data {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.replay-no-data-icon {
+    font-size: 3rem;
+}
+
+/* =============================================================================
+   Game Timeline
+   ============================================================================= */
+.timeline-body {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.timeline-step {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    padding: 0.35rem 1rem;
+    border-bottom: 1px solid var(--bg-header);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.1s;
+}
+
+.timeline-step:last-child { border-bottom: none; }
+
+.timeline-step:hover { background-color: var(--bg-header); }
+
+.timeline-step.active {
+    background-color: rgb(13 110 253 / 15%);
+    border-left: 3px solid #0d6efd;
+    padding-left: calc(1rem - 3px);
+}
+
+html[data-theme="light"] .timeline-step.active {
+    background-color: rgb(13 110 253 / 10%);
+}
+
+.timeline-step-num {
+    flex: 0 0 2.5rem;
+    text-align: right;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+}
+
+.timeline-step-turn {
+    flex: 0 0 3rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.timeline-step-actor {
+    flex: 0 0 5.5rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.timeline-step-desc {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+/* =============================================================================
+   Miscellaneous Utilities
+   ============================================================================= */
+
+/* Native <details>/<summary> elements should show a pointer cursor */
+details > summary {
+    cursor: pointer;
 }
