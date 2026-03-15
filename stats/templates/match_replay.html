@@ -40,6 +40,65 @@
         font-size: 2rem;
     }
 
+    /* ── Game Timeline ──────────────────────────────────────────── */
+    .timeline-body {
+        max-height: 360px;
+        overflow-y: auto;
+    }
+
+    .timeline-step {
+        display: flex;
+        gap: 0.6rem;
+        align-items: baseline;
+        padding: 0.35rem 1rem;
+        border-bottom: 1px solid var(--bg-header);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background 0.1s;
+    }
+
+    .timeline-step:last-child { border-bottom: none; }
+
+    .timeline-step:hover { background-color: var(--bg-header); }
+
+    .timeline-step.active {
+        background-color: rgb(13 110 253 / 15%);
+        border-left: 3px solid #0d6efd;
+        padding-left: calc(1rem - 3px);
+    }
+
+    html[data-theme="light"] .timeline-step.active {
+        background-color: rgb(13 110 253 / 10%);
+    }
+
+    .timeline-step-num {
+        flex: 0 0 2.5rem;
+        text-align: right;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        font-size: 0.75rem;
+    }
+
+    .timeline-step-turn {
+        flex: 0 0 3rem;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
+    .timeline-step-actor {
+        flex: 0 0 5.5rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .timeline-step-desc {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-primary);
+    }
+
     .replay-info {
         flex: 1;
         display: flex;
@@ -214,6 +273,17 @@
         </div>
     </div>
 
+    <!-- Game Timeline -->
+    <div class="card">
+        <div class="card-header d-flex align-items-center gap-2">
+            <strong>Game Timeline</strong>
+            <span class="text-muted small" id="timelineCount"></span>
+        </div>
+        <div class="card-body p-0">
+            <div class="timeline-body" id="replayTimeline"></div>
+        </div>
+    </div>
+
     {% endif %}
 </div>
 {% endblock %}
@@ -237,6 +307,8 @@
     const btnNext     = document.getElementById("btnNext");
     const btnFirst    = document.getElementById("btnFirst");
     const btnLast     = document.getElementById("btnLast");
+    const timeline    = document.getElementById("replayTimeline");
+    const timelineCount = document.getElementById("timelineCount");
 
     function render() {
         const s = steps[idx];
@@ -292,7 +364,40 @@
         btnFirst.disabled = idx === 0;
         btnNext.disabled = idx === steps.length - 1;
         btnLast.disabled = idx === steps.length - 1;
+
+        // Highlight active timeline row and scroll into view
+        const prevActive = timeline.querySelector(".timeline-step.active");
+        if (prevActive) prevActive.classList.remove("active");
+        const activeRow = timeline.querySelector(`[data-step-idx="${idx}"]`);
+        if (activeRow) {
+            activeRow.classList.add("active");
+            activeRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
     }
+
+    // Build timeline rows
+    timelineCount.textContent = `${steps.length} steps`;
+    steps.forEach(function (s, i) {
+        const row = document.createElement("div");
+        row.className = "timeline-step";
+        row.dataset.stepIdx = i;
+
+        const actorClass = s.actor === "You" ? "replay-actor-you"
+            : s.actor === "Opponent" ? "replay-actor-opp" : "";
+        const turn = s.turn != null ? `T${s.turn}` : "T?";
+        const desc = s.is_token
+            ? `[Token] ${s.card_name || ""} — ${s.action}`
+            : `${s.action}${s.card_name ? ": " + s.card_name : ""}`;
+
+        row.innerHTML =
+            `<span class="timeline-step-num">${i + 1}</span>` +
+            `<span class="timeline-step-turn">${turn}</span>` +
+            `<span class="timeline-step-actor ${actorClass}">${s.actor}</span>` +
+            `<span class="timeline-step-desc">${desc}</span>`;
+
+        row.addEventListener("click", function () { idx = i; render(); });
+        timeline.appendChild(row);
+    });
 
     btnNext.addEventListener("click",  function () { if (idx < steps.length - 1) { idx++; render(); } });
     btnPrev.addEventListener("click",  function () { if (idx > 0) { idx--; render(); } });
