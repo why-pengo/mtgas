@@ -1,0 +1,24 @@
+{% comment %}
+Renders added/removed/changed cards for one zone (mainboard or sideboard).
+Variables expected: zone (ZoneDiff instance)
+{% endcomment %}
+{% for delta in zone.added %}
+<div class="deck-diff-row deck-diff-added">
+    <span class="deck-diff-qty">+{{ delta.quantity_after }}×</span>
+    <span>{{ delta.name }}</span>
+</div>
+{% endfor %}
+{% for delta in zone.removed %}
+<div class="deck-diff-row deck-diff-removed">
+    <span class="deck-diff-qty">-{{ delta.quantity_before }}×</span>
+    <span>{{ delta.name }}</span>
+</div>
+{% endfor %}
+{% for delta in zone.changed %}
+<div class="deck-diff-row deck-diff-changed">
+    <span class="deck-diff-qty">
+        {% if delta.delta > 0 %}+{{ delta.delta }}{% else %}{{ delta.delta }}{% endif %}×
+    </span>
+    <span>{{ delta.name }} ({{ delta.quantity_before }}→{{ delta.quantity_after }})</span>
+</div>
+{% endfor %}
