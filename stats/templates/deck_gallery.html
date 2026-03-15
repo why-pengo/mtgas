@@ -15,6 +15,7 @@
         border-radius: 8px;
         overflow: hidden;
         transition: transform 0.2s, box-shadow 0.2s;
+        cursor: zoom-in;
     }
     .card-item:hover {
         transform: translateY(-5px);
@@ -158,7 +159,10 @@
     
     <div class="card-gallery">
         {% for item in cards %}
-        <div class="card-item">
+        <div class="card-item"
+             {% if item.image_cached %}data-card-image="/static/card_images/{{ item.card.grp_id }}.jpg"{% elif item.image_url %}data-card-image="{{ item.image_url }}"{% endif %}
+             data-card-fallback="{{ item.card.image_uri|default:'' }}">
+            <span class="card-zoom-icon" aria-hidden="true">🔍</span>
             {% if item.quantity > 1 %}
             <div class="card-quantity">{{ item.quantity }}</div>
             {% endif %}

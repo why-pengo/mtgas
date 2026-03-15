@@ -15,6 +15,53 @@
     }
 
     // -------------------------------------------------------------------------
+    // Card zoom modal
+    // -------------------------------------------------------------------------
+    function initCardZoom() {
+        const modal = document.getElementById("card-zoom-modal");
+        const zoomImg = document.getElementById("card-zoom-img");
+        const backdrop = document.getElementById("card-zoom-backdrop");
+        if (!modal || !zoomImg) return;
+
+        function openZoom(src, fallback) {
+            zoomImg.onerror = fallback
+                ? function () { zoomImg.src = fallback; zoomImg.onerror = null; }
+                : null;
+            zoomImg.src = src;
+            modal.classList.add("open");
+            modal.setAttribute("aria-hidden", "false");
+        }
+
+        function closeZoom() {
+            modal.classList.remove("open");
+            modal.setAttribute("aria-hidden", "true");
+            zoomImg.src = "";
+        }
+
+        backdrop.addEventListener("click", closeZoom);
+        zoomImg.addEventListener("click", closeZoom);
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") closeZoom();
+        });
+
+        // Deck detail zoom buttons
+        document.addEventListener("click", function (e) {
+            const btn = e.target.closest(".card-zoom-btn[data-card-image]");
+            if (!btn) return;
+            e.preventDefault();
+            openZoom(btn.dataset.cardImage, btn.dataset.cardFallback || "");
+        });
+
+        // Gallery card items
+        document.addEventListener("click", function (e) {
+            const item = e.target.closest(".card-item[data-card-image]");
+            if (!item) return;
+            openZoom(item.dataset.cardImage, item.dataset.cardFallback || "");
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Card preview popup
     // -------------------------------------------------------------------------
     function initCardPreviews() {
@@ -69,6 +116,7 @@
         }
 
         initCardPreviews();
+        initCardZoom();
     });
 })();
 
