@@ -1,0 +1,75 @@
+services:
+
+  # ─── Django web application ────────────────────────────────────────────────
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app                  # bind mount: live code changes reflected immediately
+      - /app/.venv              # shadow local .venv so container Python is used
+      - /app/node_modules       # shadow local node_modules
+      - data_cache:/app/data/cache   # persist Scryfall card image cache
+      - media:/app/media             # persist uploaded / generated media
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Always point to the Docker Postgres service, regardless of .env
+      POSTGRES_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Celery worker ────────────────────────────────────────────────────────
+  celery:
+    build: .
+    command: celery -A mtgas_project worker --loglevel=info
+    volumes:
+      - .:/app                  # bind mount: live code changes reflected immediately
+      - /app/.venv
+      - /app/node_modules
+      - data_cache:/app/data/cache
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mtgas}
+      POSTGRES_USER: ${POSTGRES_USER:-mtgas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mtgas_dev_password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mtgas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── Redis (Celery broker) ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:   # PostgreSQL data directory
+  redis_data:      # Redis persistence (AOF/RDB)
+  data_cache:      # Scryfall card image cache (data/cache/)
+  media:           # Django MEDIA_ROOT

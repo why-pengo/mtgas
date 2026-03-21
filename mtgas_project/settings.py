@@ -1,19 +1,37 @@
 """
 Django settings for mtgas_project.
+
+Environment variables (all optional — sensible defaults for local development):
+  DJANGO_SECRET_KEY   — secret key (insecure default used when not set)
+  DJANGO_DEBUG        — "True" / "False" (default: "True")
+  DJANGO_ALLOWED_HOSTS — comma-separated extra hosts (e.g. "example.com,api.example.com")
+  POSTGRES_DB         — PostgreSQL database name; when set, enables PostgreSQL instead of SQLite
+  POSTGRES_USER       — PostgreSQL user (default: "mtgas")
+  POSTGRES_PASSWORD   — PostgreSQL password
+  POSTGRES_HOST       — PostgreSQL host (default: "localhost")
+  POSTGRES_PORT       — PostgreSQL port (default: "5432")
+  CELERY_BROKER_URL   — Celery broker URL (default: "redis://localhost:6379/0")
+  TIME_ZONE           — Django timezone (default: "America/New_York")
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-mtgas-dev-key-change-in-production"
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY", "django-insecure-mtgas-dev-key-change-in-production"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() not in ("false", "0", "no")
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+_extra_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS", "")
+if _extra_hosts:
+    ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(",") if h.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -59,12 +77,26 @@ TEMPLATES = [
 WSGI_APPLICATION = "mtgas_project.wsgi.application"
 
 # Database
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "data" / "mtga_stats.db",
+# When POSTGRES_DB is set, use PostgreSQL. Otherwise, fall back to SQLite (default for local dev).
+_postgres_db = os.environ.get("POSTGRES_DB")
+if _postgres_db:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _postgres_db,
+            "USER": os.environ.get("POSTGRES_USER", "mtgas"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "data" / "mtga_stats.db",
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -76,7 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "America/New_York"  # Eastern Time (EST/EDT)
+TIME_ZONE = os.environ.get("TIME_ZONE", "America/New_York")
 USE_I18N = True
 USE_TZ = True
 
@@ -95,7 +127,7 @@ MTGA_LOG_PATH = None  # Set via environment or command line
 SCRYFALL_CACHE_DIR = BASE_DIR / "data" / "cache"
 
 # --- Celery ---
-CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
@@ -104,7 +136,5 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 5 * 60
 
 # --- Media files (local filesystem) ---
-import os  # noqa: E402
-
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
