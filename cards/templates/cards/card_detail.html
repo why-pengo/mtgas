@@ -27,12 +27,11 @@
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="card h-100" style="background:var(--bg-card); border-color:var(--bs-border-color);">
+        <div class="card h-100">
             <div class="card-body">
                 <h5 class="card-title">Your Upload</h5>
                 <img src="{{ card.image.url }}"
-                     class="img-fluid rounded"
-                     style="max-width:100%; border:1px solid var(--bs-border-color);"
+                     class="img-fluid rounded card-upload-img"
                      alt="Uploaded paper card">
             </div>
         </div>
@@ -40,7 +39,7 @@
 
     {% if card.scryfall_card %}
     <div class="col-md-8">
-        <div class="card h-100" style="background:var(--bg-card); border-color:var(--bs-border-color);">
+        <div class="card h-100">
             <div class="card-body">
                 <h5 class="card-title">
                     Matched: {{ card.scryfall_card.name }}
@@ -54,8 +53,7 @@
                     {% if card.scryfall_card.image_uri %}
                     <div class="col-auto">
                         <img src="{{ card.scryfall_card.image_uri }}"
-                             class="img-fluid rounded"
-                             style="max-width:220px; border:1px solid var(--bs-border-color);"
+                             class="img-fluid rounded card-scryfall-img"
                              alt="{{ card.scryfall_card.name }}">
                     </div>
                     {% endif %}

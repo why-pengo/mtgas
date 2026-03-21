@@ -1045,3 +1045,20 @@ details > summary {
     color: var(--text-muted);
     margin-top: 0.5rem;
 }
+
+/* ─── Paper card images ──────────────────────────────────────────────────── */
+.card-upload-img {
+    max-width: 100%;
+    border: 1px solid var(--bs-border-color);
+}
+
+.card-scryfall-img {
+    max-width: 220px;
+    border: 1px solid var(--bs-border-color);
+}
+
+/* ─── Service status detail ──────────────────────────────────────────────── */
+.service-detail {
+    word-break: break-all;
+    color: var(--text-muted);
+}
