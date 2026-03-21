@@ -4,6 +4,7 @@ from django.views.decorators.http import require_http_methods
 
 from stats.models import Card
 
+from .forms import CardImageUploadForm
 from .models import CardImage
 from .tasks import match_card_image
 
@@ -36,11 +37,12 @@ def card_photography_guide(request):
 @require_http_methods(["GET", "POST"])
 def upload_card(request):
     if request.method == "POST":
-        f = request.FILES.get("image")
-        if not f:
-            return render(request, "cards/upload.html", {"error": "Please select an image."})
+        form = CardImageUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            error = " ".join(str(e) for errs in form.errors.values() for e in errs)
+            return render(request, "cards/upload.html", {"error": error})
 
-        card = CardImage.objects.create(image=f)
+        card = form.save()
         transaction.on_commit(lambda: match_card_image.delay(card.pk))
         return redirect("cards:card_detail", pk=card.pk)
 

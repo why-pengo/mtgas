@@ -305,6 +305,34 @@ class TestUploadCardView:
 
         assert CardImage.objects.filter(pk=called_pk).exists()
 
+    def test_post_with_non_image_shows_error(self, client, settings, tmp_path):
+        """POST with a non-image file is rejected before saving to disk."""
+        from cards.models import CardImage
+
+        settings.MEDIA_ROOT = str(tmp_path)
+        bad_file = SimpleUploadedFile("evil.png", b"not image bytes", content_type="image/png")
+        response = client.post(reverse("cards:upload"), {"image": bad_file})
+
+        assert response.status_code == 200
+        assert b"valid image" in response.content
+        assert CardImage.objects.count() == 0
+
+    def test_post_with_oversized_image_shows_error(self, client, settings, tmp_path):
+        """POST with a file exceeding MAX_UPLOAD_BYTES is rejected before saving."""
+        from cards.models import CardImage
+
+        settings.MEDIA_ROOT = str(tmp_path)
+        image_bytes = _make_png_bytes()
+        image_file = SimpleUploadedFile("card.png", image_bytes, content_type="image/png")
+        # Patch the limit to be smaller than the test file so rejection fires without
+        # needing to allocate a real 10 MB buffer in the test suite.
+        with patch("cards.forms.MAX_UPLOAD_BYTES", len(image_bytes) - 1):
+            response = client.post(reverse("cards:upload"), {"image": image_file})
+
+        assert response.status_code == 200
+        assert b"too large" in response.content
+        assert CardImage.objects.count() == 0
+
 
 # ---------------------------------------------------------------------------
 # TestCardDetailView
