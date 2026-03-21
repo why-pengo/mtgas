@@ -1,41 +1,109 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Card Match Result</title>
-  {% if card.status == "processing" or card.status == "pending" %}
-  <meta http-equiv="refresh" content="3">
-  {% endif %}
-</head>
-<body>
-  <h1>Match Result</h1>
+{% extends "base.html" %}
 
-  <p><strong>Status:</strong> {{ card.get_status_display }}</p>
+{% block title %}Paper Cards — Match Result{% endblock %}
 
-  {% if card.status == "pending" or card.status == "processing" %}
-    <p>Matching in progress — page will refresh automatically.</p>
-  {% endif %}
+{% block content %}
+{% if card.status == "processing" or card.status == "pending" %}
+<meta http-equiv="refresh" content="3">
+{% endif %}
 
-  <h2>Your upload</h2>
-  <img src="{{ card.image.url }}" style="max-width:300px; border:1px solid #ccc">
+<div class="d-flex align-items-center gap-3 mb-4">
+    <h1 class="mb-0">Paper Card Match</h1>
+    <span class="badge
+        {% if card.status == 'matched' %}bg-success
+        {% elif card.status == 'unmatched' %}bg-warning text-dark
+        {% elif card.status == 'failed' %}bg-danger
+        {% else %}bg-secondary
+        {% endif %} fs-6">
+        {{ card.get_status_display }}
+    </span>
+</div>
 
-  {% if card.scryfall_card %}
-    <h2>Matched: {{ card.scryfall_card.name }}</h2>
-    <p><strong>Match distance:</strong> {{ card.match_distance }} (0 = perfect)</p>
+{% if card.status == "pending" or card.status == "processing" %}
+<div class="alert alert-secondary">
+    Matching in progress — page will refresh automatically…
+</div>
+{% endif %}
 
-    {% if card.scryfall_card.image_uri %}
-      <img src="{{ card.scryfall_card.image_uri }}" style="max-width:300px">
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card h-100" style="background:var(--bg-card); border-color:var(--bs-border-color);">
+            <div class="card-body">
+                <h5 class="card-title">Your Upload</h5>
+                <img src="{{ card.image.url }}"
+                     class="img-fluid rounded"
+                     style="max-width:100%; border:1px solid var(--bs-border-color);"
+                     alt="Uploaded paper card">
+            </div>
+        </div>
+    </div>
+
+    {% if card.scryfall_card %}
+    <div class="col-md-8">
+        <div class="card h-100" style="background:var(--bg-card); border-color:var(--bs-border-color);">
+            <div class="card-body">
+                <h5 class="card-title">
+                    Matched: {{ card.scryfall_card.name }}
+                    <span class="badge bg-success ms-2">
+                        Distance: {{ card.match_distance }}
+                        {% if card.match_distance == 0 %}(perfect){% endif %}
+                    </span>
+                </h5>
+
+                <div class="row g-3 mt-1">
+                    {% if card.scryfall_card.image_uri %}
+                    <div class="col-auto">
+                        <img src="{{ card.scryfall_card.image_uri }}"
+                             class="img-fluid rounded"
+                             style="max-width:220px; border:1px solid var(--bs-border-color);"
+                             alt="{{ card.scryfall_card.name }}">
+                    </div>
+                    {% endif %}
+                    <div class="col">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr>
+                                    <th>Mana cost</th>
+                                    <td>{{ card.scryfall_card.mana_cost|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Type</th>
+                                    <td>{{ card.scryfall_card.type_line|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Set</th>
+                                    <td>{{ card.scryfall_card.set_code|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Oracle text</th>
+                                    <td>{{ card.scryfall_card.oracle_text|default:"—" }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% elif card.status == "unmatched" %}
+    <div class="col-md-8">
+        <div class="alert alert-warning h-100 mb-0">
+            <strong>No match found.</strong><br>{{ card.error }}
+        </div>
+    </div>
+
+    {% elif card.status == "failed" %}
+    <div class="col-md-8">
+        <div class="alert alert-danger h-100 mb-0">
+            <strong>Processing failed.</strong><br>{{ card.error }}
+        </div>
+    </div>
     {% endif %}
+</div>
 
-    <p><strong>Mana cost:</strong> {{ card.scryfall_card.mana_cost|default:"—" }}</p>
-    <p><strong>Type:</strong> {{ card.scryfall_card.type_line|default:"—" }}</p>
-    <p><strong>Oracle text:</strong> {{ card.scryfall_card.oracle_text|default:"—" }}</p>
-    <p><strong>Set:</strong> {{ card.scryfall_card.set_code|default:"—" }}</p>
-  {% elif card.status == "unmatched" %}
-    <p style="color:orange">No match found. {{ card.error }}</p>
-  {% elif card.status == "failed" %}
-    <p style="color:red">Processing failed: {{ card.error }}</p>
-  {% endif %}
-
-  <p><a href="{% url 'cards:upload' %}">Upload another card</a></p>
-</body>
-</html>
+<div class="mt-4">
+    <a href="{% url 'cards:upload' %}" class="btn btn-outline-secondary me-2">Upload Another Paper Card</a>
+    <a href="{% url 'cards:index' %}" class="btn btn-outline-secondary">All Paper Cards</a>
+</div>
+{% endblock %}

@@ -10,12 +10,13 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import imagehash
-import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
+
+import imagehash
+import pytest
 from PIL import Image as PILImage
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -146,6 +147,60 @@ class TestCardImageModel:
 
 
 # ---------------------------------------------------------------------------
+# TestCardIndexView
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestCardIndexView:
+    """Tests for the card_index view at /cards/."""
+
+    def test_get_returns_200(self, client):
+        """GET /cards/ returns 200 with no uploads."""
+        response = client.get(reverse("cards:index"))
+        assert response.status_code == 200
+
+    def test_empty_state_shows_no_uploads_message(self, client):
+        """When no CardImages exist, the page says so."""
+        response = client.get(reverse("cards:index"))
+        assert b"No paper cards uploaded yet" in response.content
+
+    def test_lists_recent_uploads(self, client, card_image, scryfall_card):
+        """Existing CardImages appear in the table."""
+        from cards.models import CardImage
+
+        card_image.status = CardImage.Status.MATCHED
+        card_image.scryfall_card = scryfall_card
+        card_image.match_distance = 4
+        card_image.save()
+
+        response = client.get(reverse("cards:index"))
+        assert response.status_code == 200
+        assert scryfall_card.name.encode() in response.content
+        assert b"Matched" in response.content
+
+    def test_shows_at_most_20_entries(self, client, settings, tmp_path):
+        """Only the 20 most recent uploads are shown."""
+        from cards.models import CardImage
+
+        settings.MEDIA_ROOT = str(tmp_path)
+        for i in range(25):
+            ci = CardImage(status=CardImage.Status.PENDING)
+            ci.image = f"cards/test/card_{i}.png"
+            ci.save()
+
+        response = client.get(reverse("cards:index"))
+        # 20 rows = 20 links to card_detail
+        assert response.content.count(b"/cards/card/") == 20
+
+    def test_upload_link_is_present(self, client):
+        """The page always contains a link to the upload view."""
+        response = client.get(reverse("cards:index"))
+        upload_url = reverse("cards:upload").encode()
+        assert upload_url in response.content
+
+
+# ---------------------------------------------------------------------------
 # TestUploadCardView
 # ---------------------------------------------------------------------------
 
@@ -165,20 +220,14 @@ class TestUploadCardView:
         assert response.status_code == 200
         assert b"Please select an image" in response.content
 
-    def test_post_with_image_creates_card_image_and_redirects(
-        self, client, settings, tmp_path
-    ):
+    def test_post_with_image_creates_card_image_and_redirects(self, client, settings, tmp_path):
         """POST with image creates CardImage and 302 redirects to card_detail."""
         from cards.models import CardImage
 
         settings.MEDIA_ROOT = str(tmp_path)
-        image_file = SimpleUploadedFile(
-            "card.png", _make_png_bytes(), content_type="image/png"
-        )
+        image_file = SimpleUploadedFile("card.png", _make_png_bytes(), content_type="image/png")
         with patch("cards.views.match_card_image"):
-            response = client.post(
-                reverse("cards:upload"), {"image": image_file}, follow=False
-            )
+            response = client.post(reverse("cards:upload"), {"image": image_file}, follow=False)
 
         assert response.status_code == 302
         assert CardImage.objects.count() == 1
@@ -188,9 +237,7 @@ class TestUploadCardView:
     def test_post_dispatches_celery_task(self, client, settings, tmp_path):
         """POST calls match_card_image.delay_on_commit with the new CardImage pk."""
         settings.MEDIA_ROOT = str(tmp_path)
-        image_file = SimpleUploadedFile(
-            "card.png", _make_png_bytes(), content_type="image/png"
-        )
+        image_file = SimpleUploadedFile("card.png", _make_png_bytes(), content_type="image/png")
         with patch("cards.views.match_card_image") as mock_task:
             client.post(reverse("cards:upload"), {"image": image_file})
             mock_task.delay_on_commit.assert_called_once()
@@ -373,9 +420,7 @@ class TestBuildPhashIndex:
 
         Card.objects.create(grp_id=88001, name="No URI Card", image_uri=None)
 
-        with patch(
-            "cards.management.commands.build_phash_index.requests.get"
-        ) as mock_get:
+        with patch("cards.management.commands.build_phash_index.requests.get") as mock_get:
             call_command("build_phash_index")
 
         mock_get.assert_not_called()

@@ -5,6 +5,15 @@ from .models import CardImage
 from .tasks import match_card_image
 
 
+def card_index(request):
+    recent = CardImage.objects.select_related("scryfall_card").order_by("-uploaded_at")[:20]
+    return render(request, "cards/index.html", {"recent": recent})
+
+
+def card_photography_guide(request):
+    return render(request, "card_image_help.html")
+
+
 @require_http_methods(["GET", "POST"])
 def upload_card(request):
     if request.method == "POST":
