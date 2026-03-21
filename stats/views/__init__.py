@@ -10,6 +10,7 @@ from .dashboard import api_stats, dashboard
 from .decks import deck_detail, deck_gallery, deck_history, decks_list
 from .imports import card_data, import_log, import_sessions
 from .matches import match_detail, match_replay, matches_list
+from .status import service_control, service_status, service_status_api
 
 __all__ = [
     "dashboard",
@@ -26,4 +27,7 @@ __all__ = [
     "card_data",
     "unknown_cards_list",
     "unknown_card_fix",
+    "service_status",
+    "service_status_api",
+    "service_control",
 ]

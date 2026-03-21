@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Test / coverage artefacts
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.tox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local data (large / gitignored files)
+data/cache/
+data/*.db
+
+# Static / media collected outputs
+staticfiles/
+media/
+
+# Logs
+*.log
+logs/
+
+# Environment files (never bake secrets into the image)
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
