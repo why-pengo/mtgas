@@ -24,6 +24,12 @@ class Card(models.Model):
     toughness = models.CharField(max_length=10, null=True, blank=True)
     scryfall_id = models.CharField(max_length=50, null=True, blank=True)
     image_uri = models.URLField(max_length=500, null=True, blank=True)
+    phash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Perceptual hash of card image for visual matching",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     # Token / non-card game object metadata
@@ -46,6 +52,9 @@ class Card(models.Model):
     class Meta:
         db_table = "cards"
         verbose_name_plural = "Cards"
+        indexes = [
+            models.Index(fields=["phash"], name="scryfall_phash_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.name or f"Unknown ({self.grp_id})"

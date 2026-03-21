@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Card Match Result</title>
+  {% if card.status == "processing" or card.status == "pending" %}
+  <meta http-equiv="refresh" content="3">
+  {% endif %}
+</head>
+<body>
+  <h1>Match Result</h1>
+
+  <p><strong>Status:</strong> {{ card.get_status_display }}</p>
+
+  {% if card.status == "pending" or card.status == "processing" %}
+    <p>Matching in progress — page will refresh automatically.</p>
+  {% endif %}
+
+  <h2>Your upload</h2>
+  <img src="{{ card.image.url }}" style="max-width:300px; border:1px solid #ccc">
+
+  {% if card.scryfall_card %}
+    <h2>Matched: {{ card.scryfall_card.name }}</h2>
+    <p><strong>Match distance:</strong> {{ card.match_distance }} (0 = perfect)</p>
+
+    {% if card.scryfall_card.image_uri %}
+      <img src="{{ card.scryfall_card.image_uri }}" style="max-width:300px">
+    {% endif %}
+
+    <p><strong>Mana cost:</strong> {{ card.scryfall_card.mana_cost|default:"—" }}</p>
+    <p><strong>Type:</strong> {{ card.scryfall_card.type_line|default:"—" }}</p>
+    <p><strong>Oracle text:</strong> {{ card.scryfall_card.oracle_text|default:"—" }}</p>
+    <p><strong>Set:</strong> {{ card.scryfall_card.set_code|default:"—" }}</p>
+  {% elif card.status == "unmatched" %}
+    <p style="color:orange">No match found. {{ card.error }}</p>
+  {% elif card.status == "failed" %}
+    <p style="color:red">Processing failed: {{ card.error }}</p>
+  {% endif %}
+
+  <p><a href="{% url 'cards:upload' %}">Upload another card</a></p>
+</body>
+</html>
