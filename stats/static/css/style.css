@@ -1009,3 +1009,39 @@ html[data-theme="light"] .timeline-step.active {
 details > summary {
     cursor: pointer;
 }
+
+/* =============================================================================
+   Phash Index Status Widget (cards/index.html)
+   ============================================================================= */
+
+.phash-status-card {
+    background: var(--bg-card);
+    border-color: var(--bs-border-color);
+}
+
+.phash-status-title {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.phash-status-counts {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.phash-status-missing {
+    color: var(--bs-warning-text-emphasis);
+}
+
+.phash-progress {
+    height: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.phash-status-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}

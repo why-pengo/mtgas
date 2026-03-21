@@ -199,6 +199,63 @@ class TestCardIndexView:
         upload_url = reverse("cards:upload").encode()
         assert upload_url in response.content
 
+    def test_phash_context_values_present(self, client, db):
+        """Context includes phash_total, phash_indexed, phash_missing, phash_pct."""
+        response = client.get(reverse("cards:index"))
+        assert "phash_total" in response.context
+        assert "phash_indexed" in response.context
+        assert "phash_missing" in response.context
+        assert "phash_pct" in response.context
+
+    def test_phash_counts_reflect_database(self, client, db):
+        """Phash context values accurately count indexed vs. missing cards."""
+        from stats.models import Card
+
+        Card.objects.create(grp_id=9001, name="Indexed Card", phash="aabbccdd11223344")
+        Card.objects.create(grp_id=9002, name="Not Indexed Card", phash=None)
+
+        response = client.get(reverse("cards:index"))
+        # These values are relative to whatever is already in the test DB, so just
+        # check that indexed < total when at least one card is missing a phash.
+        assert response.context["phash_indexed"] < response.context["phash_total"]
+        assert response.context["phash_missing"] >= 1
+
+    def test_phash_progress_bar_shown_when_cards_exist(self, client, db):
+        """The progress bar widget appears when the Card table has rows."""
+        from stats.models import Card
+
+        Card.objects.create(grp_id=9003, name="Any Card", phash=None)
+        response = client.get(reverse("cards:index"))
+        assert b"phash-progress" in response.content
+
+    def test_phash_cli_hint_shown_when_cards_missing(self, client, db):
+        """A hint to run build_phash_index is shown when phash_missing > 0."""
+        from stats.models import Card
+
+        Card.objects.create(grp_id=9004, name="Missing Phash", phash=None)
+        response = client.get(reverse("cards:index"))
+        assert b"build_phash_index" in response.content
+
+    def test_phash_cli_hint_hidden_when_fully_indexed(self, client, db):
+        """No hint shown when every card already has a phash."""
+        from stats.models import Card
+
+        # Remove any cards without phash for this test
+        Card.objects.filter(phash__isnull=True).delete()
+        Card.objects.filter(phash="").delete()
+        Card.objects.create(grp_id=9005, name="Fully Indexed", phash="aabb1122ccdd3344")
+
+        response = client.get(reverse("cards:index"))
+        assert b"build_phash_index" not in response.content
+
+    def test_phash_widget_hidden_when_no_cards_in_db(self, client, db):
+        """Progress bar widget is not shown when the Card table is empty."""
+        from stats.models import Card
+
+        Card.objects.all().delete()
+        response = client.get(reverse("cards:index"))
+        assert b"phash-progress" not in response.content
+
 
 # ---------------------------------------------------------------------------
 # TestUploadCardView

@@ -14,6 +14,30 @@
     </div>
 </div>
 
+{% if phash_total %}
+<div class="card mb-4 phash-status-card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-baseline mb-1">
+            <h6 class="card-subtitle phash-status-title">Phash Index</h6>
+            <span class="phash-status-counts">
+                {{ phash_indexed }} / {{ phash_total }} cards indexed
+                {% if phash_missing %}<span class="phash-status-missing">({{ phash_missing }} missing)</span>{% endif %}
+            </span>
+        </div>
+        <div class="progress phash-progress" role="progressbar"
+             aria-valuenow="{{ phash_pct }}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar {% if phash_pct == 100 %}bg-success{% elif phash_pct >= 50 %}bg-info{% else %}bg-warning{% endif %}"
+                 style="width: {{ phash_pct }}%">{{ phash_pct }}%</div>
+        </div>
+        {% if phash_missing %}
+        <p class="phash-status-hint mb-0">
+            Run <code>python manage.py build_phash_index</code> to index the remaining {{ phash_missing }} card{{ phash_missing|pluralize }}.
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% if recent %}
 <div class="card" style="background:var(--bg-card); border-color:var(--bs-border-color);">
     <div class="card-body p-0">
