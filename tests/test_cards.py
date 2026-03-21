@@ -292,13 +292,14 @@ class TestUploadCardView:
         assert response["Location"] == reverse("cards:card_detail", kwargs={"pk": card.pk})
 
     def test_post_dispatches_celery_task(self, client, settings, tmp_path):
-        """POST calls match_card_image.delay_on_commit with the new CardImage pk."""
+        """POST dispatches match_card_image.delay inside a transaction.on_commit callback."""
         settings.MEDIA_ROOT = str(tmp_path)
         image_file = SimpleUploadedFile("card.png", _make_png_bytes(), content_type="image/png")
-        with patch("cards.views.match_card_image") as mock_task:
-            client.post(reverse("cards:upload"), {"image": image_file})
-            mock_task.delay_on_commit.assert_called_once()
-            called_pk = mock_task.delay_on_commit.call_args[0][0]
+        with patch("cards.views.transaction.on_commit", side_effect=lambda fn: fn()):
+            with patch("cards.views.match_card_image") as mock_task:
+                client.post(reverse("cards:upload"), {"image": image_file})
+                mock_task.delay.assert_called_once()
+                called_pk = mock_task.delay.call_args[0][0]
 
         from cards.models import CardImage
 

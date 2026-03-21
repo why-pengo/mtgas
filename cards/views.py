@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -40,7 +41,7 @@ def upload_card(request):
             return render(request, "cards/upload.html", {"error": "Please select an image."})
 
         card = CardImage.objects.create(image=f)
-        match_card_image.delay_on_commit(card.pk)
+        transaction.on_commit(lambda: match_card_image.delay(card.pk))
         return redirect("cards:card_detail", pk=card.pk)
 
     return render(request, "cards/upload.html")
