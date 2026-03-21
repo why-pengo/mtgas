@@ -2,6 +2,7 @@ import requests
 import imagehash
 from io import BytesIO
 from PIL import Image
+from django.db.models import Q
 from django.core.management.base import BaseCommand
 
 from stats.models import Card
@@ -24,9 +25,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        qs = Card.objects.all()
+        qs = Card.objects.exclude(image_uri__isnull=True).exclude(image_uri="")
         if not options["overwrite"]:
-            qs = qs.filter(phash__isnull=True)
+            qs = qs.filter(Q(phash__isnull=True) | Q(phash=""))
         if options["limit"]:
             qs = qs[: options["limit"]]
 
@@ -38,8 +39,6 @@ class Command(BaseCommand):
         for card in qs.iterator():
             try:
                 url = card.image_uri
-                if not url:
-                    continue
                 resp = requests.get(url, timeout=10)
                 resp.raise_for_status()
                 img = Image.open(BytesIO(resp.content)).convert("RGB")
