@@ -144,4 +144,64 @@
 </div>
 {% endfor %}
 
+{% if tokens %}
+<div class="category-section">
+    <h2 class="category-title">
+        Tokens
+        <span class="badge bg-secondary">{{ tokens|length }}</span>
+    </h2>
+    <div class="card-gallery">
+        {% for item in tokens %}
+        <div class="card-item"
+             {% if item.token.image_uri %}data-card-image="{{ item.token.image_uri }}"{% endif %}>
+            {% if item.token.image_uri %}
+            <span class="card-zoom-icon" aria-hidden="true">🔍</span>
+            {% endif %}
+            <div class="card-image-container">
+                {% if item.token.image_uri %}
+                    <img src="{{ item.token.image_uri }}"
+                         alt="{{ item.token.name }}"
+                         class="card-image"
+                         loading="lazy">
+                {% else %}
+                    <div class="card-placeholder">
+                        <strong>{{ item.token.name }}</strong><br>
+                        <small>No image available</small>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-info">
+                <small><strong>{{ item.token.name }}</strong></small><br>
+                <small class="text-muted">
+                    {% if item.token.power and item.token.toughness %}
+                        {{ item.token.power }}/{{ item.token.toughness }}
+                        {% if item.token.type_line %} · {{ item.token.type_line }}{% endif %}
+                    {% elif item.token.type_line %}
+                        {{ item.token.type_line }}
+                    {% endif %}
+                </small>
+                <div class="card-actions">
+                    <a href="{{ item.scryfall_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="card-action-btn"
+                       title="View on Scryfall"
+                       aria-label="View {{ item.token.name }} on Scryfall">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                    <button type="button"
+                            class="card-action-btn card-copy-name"
+                            data-card-name="{{ item.token.name }}"
+                            title="Copy token name"
+                            aria-label="Copy {{ item.token.name }} to clipboard">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

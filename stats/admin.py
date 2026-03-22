@@ -4,7 +4,17 @@ Django admin configuration for MTG Arena Statistics.
 
 from django.contrib import admin
 
-from .models import Card, Deck, DeckCard, DeckSnapshot, ImportSession, Match, UnknownCard
+from .models import (
+    Card,
+    CardToken,
+    CardTokenRef,
+    Deck,
+    DeckCard,
+    DeckSnapshot,
+    ImportSession,
+    Match,
+    UnknownCard,
+)
 
 
 @admin.register(Card)
@@ -12,6 +22,19 @@ class CardAdmin(admin.ModelAdmin):
     list_display = ("grp_id", "name", "mana_cost", "type_line", "rarity")
     search_fields = ("name", "grp_id")
     list_filter = ("rarity", "set_code")
+
+
+@admin.register(CardToken)
+class CardTokenAdmin(admin.ModelAdmin):
+    list_display = ("scryfall_id", "name", "type_line", "power", "toughness")
+    search_fields = ("name", "scryfall_id")
+
+
+@admin.register(CardTokenRef)
+class CardTokenRefAdmin(admin.ModelAdmin):
+    list_display = ("card", "token")
+    raw_id_fields = ("card", "token")
+    search_fields = ("card__name", "token__name")
 
 
 class DeckCardInline(admin.TabularInline):

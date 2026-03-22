@@ -48,6 +48,12 @@ class Card(models.Model):
         blank=True,
         help_text="grpId of the card that created this token/emblem",
     )
+    tokens = models.ManyToManyField(
+        "CardToken",
+        through="CardTokenRef",
+        blank=True,
+        help_text="Scryfall token cards this card can create",
+    )
 
     class Meta:
         db_table = "cards"
@@ -58,6 +64,40 @@ class Card(models.Model):
 
     def __str__(self) -> str:
         return self.name or f"Unknown ({self.grp_id})"
+
+
+class CardToken(models.Model):
+    """A token card fetched from Scryfall (e.g. '1/1 Red Warrior Token')."""
+
+    scryfall_id = models.CharField(max_length=50, primary_key=True)
+    name = models.CharField(max_length=255)
+    type_line = models.CharField(max_length=255, null=True, blank=True)
+    image_uri = models.URLField(max_length=500, null=True, blank=True)
+    colors = models.JSONField(default=list, blank=True)
+    power = models.CharField(max_length=10, null=True, blank=True)
+    toughness = models.CharField(max_length=10, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "card_tokens"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class CardTokenRef(models.Model):
+    """Through-model linking a Card to a token it can create."""
+
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="token_refs")
+    token = models.ForeignKey(CardToken, on_delete=models.CASCADE, related_name="card_refs")
+
+    class Meta:
+        db_table = "card_token_refs"
+        unique_together = ("card", "token")
+
+    def __str__(self) -> str:
+        return f"{self.card} → {self.token}"
 
 
 class Deck(models.Model):

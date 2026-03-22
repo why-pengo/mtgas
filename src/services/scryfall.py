@@ -3,6 +3,7 @@ Scryfall Card Service.
 
 Provides card name lookup and metadata from Scryfall's bulk data.
 Downloads and indexes bulk JSON for efficient local lookups.
+Token card data is fetched on-demand via Scrython with built-in rate limiting.
 """
 
 import json
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Set
 
 import requests
+import scrython
+from scrython.base import ScryfallError
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +237,15 @@ class ScryfallBulkService:
             "scryfall_id": card.get("id"),
             "arena_id": card.get("arena_id"),
             "image_uri": image_uri,
+            "token_parts": [
+                {
+                    "scryfall_id": p["id"],
+                    "name": p.get("name", ""),
+                    "type_line": p.get("type_line", ""),
+                }
+                for p in card.get("all_parts", [])
+                if p.get("component") == "token"
+            ],
         }
 
     def get_card_by_arena_id(self, arena_id: int) -> Optional[Dict[str, Any]]:
@@ -343,6 +355,39 @@ class ScryfallBulkService:
         """
         image_path = self.cache_dir / "card_images" / f"{card_grp_id}.jpg"
         return image_path if image_path.exists() else None
+
+    def fetch_token_data(self, scryfall_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch token card data from Scryfall by its UUID.
+
+        Uses Scrython with built-in rate limiting (10 req/s). Token cards are not
+        present in the default_cards bulk data (they have no arena_id), so they
+        must be retrieved individually via the API.
+
+        Args:
+            scryfall_id: Scryfall UUID of the token card
+
+        Returns:
+            Simplified token data dict, or None if fetch failed
+        """
+        try:
+            card = scrython.cards.ById(id=scryfall_id)
+            image_uris = card.image_uris or {}
+            return {
+                "scryfall_id": card.id,
+                "name": card.name,
+                "type_line": card.type_line,
+                "image_uri": image_uris.get("normal") if isinstance(image_uris, dict) else None,
+                "colors": card.colors or [],
+                "power": card.power,
+                "toughness": card.toughness,
+            }
+        except ScryfallError as e:
+            logger.warning(f"Scryfall API error fetching token {scryfall_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch token {scryfall_id}: {e}")
+            return None
 
 
 # Singleton instance

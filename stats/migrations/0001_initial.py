@@ -501,4 +501,63 @@ class Migration(migrations.Migration):
                 fields=["card", "is_resolved"], name="unknown_car_grp_id_d3f73d_idx"
             ),
         ),
+        # CardToken and CardTokenRef (token images from Scryfall all_parts)
+        migrations.CreateModel(
+            name="CardToken",
+            fields=[
+                ("scryfall_id", models.CharField(max_length=50, primary_key=True, serialize=False)),
+                ("name", models.CharField(max_length=255)),
+                ("type_line", models.CharField(blank=True, max_length=255, null=True)),
+                ("image_uri", models.URLField(blank=True, max_length=500, null=True)),
+                ("colors", models.JSONField(blank=True, default=list)),
+                ("power", models.CharField(blank=True, max_length=10, null=True)),
+                ("toughness", models.CharField(blank=True, max_length=10, null=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                "db_table": "card_tokens",
+                "ordering": ["name"],
+            },
+        ),
+        migrations.CreateModel(
+            name="CardTokenRef",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "card",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="token_refs",
+                        to="stats.card",
+                    ),
+                ),
+                (
+                    "token",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="card_refs",
+                        to="stats.cardtoken",
+                    ),
+                ),
+            ],
+            options={
+                "db_table": "card_token_refs",
+                "unique_together": {("card", "token")},
+            },
+        ),
+        migrations.AddField(
+            model_name="card",
+            name="tokens",
+            field=models.ManyToManyField(
+                blank=True,
+                help_text="Scryfall token cards this card can create",
+                through="stats.CardTokenRef",
+                to="stats.cardtoken",
+            ),
+        ),
     ]

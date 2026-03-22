@@ -14,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from src.services.scryfall import get_scryfall
 
 from ..deck_diff import compute_deck_diff
-from ..models import Deck, DeckCard, DeckSnapshot, UnknownCard
+from ..models import Card, CardToken, CardTokenRef, Deck, DeckCard, DeckSnapshot, UnknownCard
 
 logger = logging.getLogger("stats.views")
 
@@ -578,6 +578,9 @@ def deck_gallery(request: HttpRequest, deck_id: int) -> HttpResponse:
     unique_cards = deck_cards.count()
     cache_percentage = round(images_cached / unique_cards * 100) if unique_cards > 0 else 0
 
+    # Collect token data for cards in this deck
+    tokens = _resolve_deck_tokens(deck_cards, scryfall)
+
     return render(
         request,
         "deck_gallery.html",
@@ -588,5 +591,76 @@ def deck_gallery(request: HttpRequest, deck_id: int) -> HttpResponse:
             "unique_cards": unique_cards,
             "total_cards": total_cards,
             "cache_percentage": cache_percentage,
+            "tokens": tokens,
         },
+    )
+
+
+def _resolve_deck_tokens(deck_cards: Any, scryfall: Any) -> list[dict]:
+    """
+    Resolve Scryfall token cards for all cards in a deck snapshot.
+
+    Looks up token_parts from the Scryfall index for each deck card, then
+    fetches/caches CardToken rows for any tokens not yet in the database.
+    Returns a deduplicated list of token dicts for template rendering.
+    """
+    # Gather all token scryfall_ids referenced by this deck's cards
+    token_parts_by_card: dict[int, list[dict]] = {}
+    all_token_ids: set[str] = set()
+
+    for dc in deck_cards:
+        card_data = scryfall.get_card_by_arena_id(dc.card.grp_id)
+        if not card_data:
+            continue
+        parts = card_data.get("token_parts", [])
+        if parts:
+            token_parts_by_card[dc.card.grp_id] = parts
+            for part in parts:
+                all_token_ids.add(part["scryfall_id"])
+
+    if not all_token_ids:
+        return []
+
+    # Fetch already-cached CardToken rows in bulk
+    existing = {
+        ct.scryfall_id: ct for ct in CardToken.objects.filter(scryfall_id__in=all_token_ids)
+    }
+
+    # Fetch missing tokens from Scryfall API and save them
+    missing_ids = all_token_ids - existing.keys()
+    for scryfall_id in missing_ids:
+        data = scryfall.fetch_token_data(scryfall_id)
+        if not data:
+            continue
+        token, _ = CardToken.objects.update_or_create(
+            scryfall_id=data["scryfall_id"],
+            defaults={
+                "name": data["name"],
+                "type_line": data.get("type_line"),
+                "image_uri": data.get("image_uri"),
+                "colors": data.get("colors", []),
+                "power": data.get("power"),
+                "toughness": data.get("toughness"),
+            },
+        )
+        existing[scryfall_id] = token
+
+    # Create CardTokenRef entries for Card→CardToken mappings
+    for grp_id, parts in token_parts_by_card.items():
+        try:
+            card = Card.objects.get(grp_id=grp_id)
+        except Card.DoesNotExist:
+            continue
+        for part in parts:
+            ct = existing.get(part["scryfall_id"])
+            if ct:
+                CardTokenRef.objects.get_or_create(card=card, token=ct)
+
+    # Return deduplicated token list sorted by name
+    return sorted(
+        [
+            {"token": ct, "scryfall_url": f"https://scryfall.com/cards/{ct.scryfall_id}"}
+            for ct in existing.values()
+        ],
+        key=lambda x: x["token"].name,
     )
