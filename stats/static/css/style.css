@@ -1214,3 +1214,153 @@ details > summary {
     border-top: 1px solid var(--bs-border-color);
     padding-top: 0.6rem;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Play Analysis Page
+   ────────────────────────────────────────────────────────────────── */
+
+.analysis-empty-icon {
+    font-size: 3rem;
+}
+
+.analysis-stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.analysis-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.analysis-legend {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.analysis-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.analysis-turn-card {
+    border-left: 3px solid var(--bs-warning);
+}
+
+.analysis-life-display {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.analysis-section-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+
+.analysis-plays-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.875rem;
+}
+
+.analysis-plays-list li {
+    margin-bottom: 0.15rem;
+}
+
+.analysis-mana-bar-wrap {
+    height: 8px;
+    background: var(--bs-border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.3rem;
+}
+
+.analysis-mana-bar-fill {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 4px;
+    min-width: 2px;
+}
+
+/* Suggestion cards */
+.analysis-suggestion {
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid var(--bs-border-color);
+}
+
+.analysis-suggestion.severity-warning {
+    background: rgb(245 158 11 / 8%);
+    border-left-color: #f59e0b;
+}
+
+.analysis-suggestion.severity-tip {
+    background: rgb(59 130 246 / 7%);
+    border-left-color: #3b82f6;
+}
+
+.analysis-suggestion-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.875rem;
+}
+
+.analysis-suggestion-body {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+
+.analysis-suggestion-cards {
+    font-size: 0.8rem;
+}
+
+.analysis-card-chip {
+    display: inline-block;
+    background: var(--bs-secondary-bg);
+    border-radius: 3px;
+    padding: 0 0.35rem;
+    font-size: 0.78rem;
+}
+
+/* Type badges (emoji + coloured dot) */
+.analysis-badge-type {
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+/* Severity pill */
+.analysis-severity-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    text-transform: capitalize;
+    margin-left: auto;
+}
+
+.analysis-severity-badge.severity-warning {
+    background: rgb(245 158 11 / 20%);
+    color: #b45309;
+}
+
+.analysis-severity-badge.severity-tip {
+    background: rgb(59 130 246 / 15%);
+    color: #1d4ed8;
+}
+
+[data-bs-theme="dark"] .analysis-severity-badge.severity-warning {
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .analysis-severity-badge.severity-tip {
+    color: #60a5fa;
+}

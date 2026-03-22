@@ -9,13 +9,14 @@ from .cards import unknown_card_fix, unknown_cards_list
 from .dashboard import api_stats, dashboard
 from .decks import deck_detail, deck_gallery, deck_history, decks_list
 from .imports import card_data, import_log, import_sessions
-from .matches import match_detail, match_replay, matches_list
+from .matches import match_analysis, match_detail, match_replay, matches_list
 from .status import service_control, service_status, service_status_api
 
 __all__ = [
     "dashboard",
     "api_stats",
     "matches_list",
+    "match_analysis",
     "match_detail",
     "match_replay",
     "decks_list",

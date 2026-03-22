@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Play Analysis — {{ match.opponent_name|default:"Unknown" }} — MTG Arena Stats{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'stats:matches' %}">Matches</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'stats:match_detail' match.id %}">{{ match.start_time|date:"M d, Y H:i"|default:"Match" }}</a></li>
+        <li class="breadcrumb-item active">Play Analysis</li>
+    </ol>
+</nav>
+
+<!-- Header -->
+<div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1">
+            Play Analysis
+            <span class="fs-5 fw-normal text-muted">vs {{ match.opponent_name|default:"Unknown" }}</span>
+        </h2>
+        <p class="text-muted mb-0">
+            {{ match.start_time|date:"F d, Y H:i"|default:"Unknown date" }}
+            {% if match.deck %} &middot; <a href="{% url 'stats:deck_detail' match.deck.id %}">{{ match.deck.name }}</a>{% endif %}
+            &middot; {{ match.total_turns|default:"?" }} turns
+        </p>
+    </div>
+    <span class="badge fs-6 {% if match.result == 'win' %}bg-success{% elif match.result == 'loss' %}bg-danger{% else %}bg-secondary{% endif %}">
+        {% if match.result == 'win' %}✓ Win{% elif match.result == 'loss' %}✗ Loss{% else %}{{ match.result|default:"Incomplete"|capfirst }}{% endif %}
+    </span>
+</div>
+
+{% if not analysis.has_data %}
+<!-- No data state -->
+<div class="card">
+    <div class="card-body text-center py-5">
+        <div class="analysis-empty-icon">🃏</div>
+        <h5 class="mt-3">No game-action data available</h5>
+        <p class="text-muted">
+            This match was imported from a log file that did not contain detailed game-action records.<br>
+            Re-import the original <code>Player.log</code> file to enable play analysis.
+        </p>
+        <a href="{% url 'stats:match_detail' match.id %}" class="btn btn-primary mt-2">Back to Match</a>
+    </div>
+</div>
+{% else %}
+
+<!-- Summary bar -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="analysis-stat-value">{{ player_turns|length }}</div>
+                <div class="analysis-stat-label">Your turns analysed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="analysis-stat-value {% if analysis.total_suggestions >= 5 %}text-warning{% elif analysis.total_suggestions > 0 %}text-info{% else %}text-success{% endif %}">{{ analysis.total_suggestions }}</div>
+                <div class="analysis-stat-label">Suggestions found</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="analysis-stat-value {% if analysis.overall_mana_efficiency < 50 %}text-danger{% elif analysis.overall_mana_efficiency < 75 %}text-warning{% else %}text-success{% endif %}">{{ analysis.overall_mana_efficiency }}%</div>
+                <div class="analysis-stat-label">Overall mana efficiency</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not flagged_turns %}
+<!-- All clean -->
+<div class="card">
+    <div class="card-body text-center py-5">
+        <div class="analysis-empty-icon">✅</div>
+        <h5 class="mt-3">No suggestions — clean game!</h5>
+        <p class="text-muted">The advisor did not detect any obvious mana-efficiency, ordering, or alternate-play issues in this match.</p>
+        <div class="mt-3">
+            <a href="{% url 'stats:match_replay' match.id %}" class="btn btn-outline-secondary me-2">▶ Replay</a>
+            <a href="{% url 'stats:match_detail' match.id %}" class="btn btn-primary">Back to Match</a>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<!-- Suggestion legend -->
+<div class="d-flex flex-wrap gap-2 mb-3 analysis-legend">
+    <span class="analysis-legend-item"><span class="analysis-badge-type type-mana_efficiency">⚡</span> Mana efficiency</span>
+    <span class="analysis-legend-item"><span class="analysis-badge-type type-ordering">🔀</span> Play ordering</span>
+    <span class="analysis-legend-item"><span class="analysis-badge-type type-missed_play">⏳</span> Missed play</span>
+    <span class="analysis-legend-item"><span class="analysis-badge-type type-alternate_play">💡</span> Alternate play</span>
+</div>
+
+<!-- Flagged turns -->
+{% for turn in flagged_turns %}
+<div class="card mb-3 analysis-turn-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Turn {{ turn.turn_number }}</span>
+        <span class="analysis-life-display">
+            <span title="Your life total">❤️ {{ turn.life_you }}</span>
+            &nbsp;&nbsp;
+            <span title="Opponent life total">💀 {{ turn.life_opp }}</span>
+        </span>
+    </div>
+    <div class="card-body">
+
+        <!-- Plays made -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <p class="analysis-section-label">Plays made</p>
+                {% if turn.plays_made %}
+                <ul class="analysis-plays-list">
+                    {% for name in turn.plays_made %}
+                    <li>{{ name }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <span class="text-muted small">No plays this turn</span>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <p class="analysis-section-label">Mana</p>
+                <div class="analysis-mana-bar-wrap" title="{{ turn.mana_spent|floatformat:0 }} of {{ turn.mana_available }} mana used">
+                    {% if turn.mana_available > 0 %}
+                    <div class="analysis-mana-bar-fill" style="width: {% widthratio turn.mana_spent turn.mana_available 100 %}%"></div>
+                    {% endif %}
+                </div>
+                <small class="text-muted">{{ turn.mana_spent|floatformat:0 }} / {{ turn.mana_available }} mana used</small>
+            </div>
+        </div>
+
+        <!-- Suggestions -->
+        {% for suggestion in turn.suggestions %}
+        <div class="analysis-suggestion severity-{{ suggestion.severity }}">
+            <div class="analysis-suggestion-header">
+                <span class="analysis-badge-type type-{{ suggestion.type }}">
+                    {% if suggestion.type == 'mana_efficiency' %}⚡
+                    {% elif suggestion.type == 'ordering' %}🔀
+                    {% elif suggestion.type == 'missed_play' %}⏳
+                    {% elif suggestion.type == 'alternate_play' %}💡
+                    {% else %}ℹ️
+                    {% endif %}
+                </span>
+                <strong>{{ suggestion.title }}</strong>
+                <span class="analysis-severity-badge severity-{{ suggestion.severity }}">{{ suggestion.severity }}</span>
+            </div>
+            <p class="analysis-suggestion-body mb-0">{{ suggestion.body }}</p>
+            {% if suggestion.cards_suggested %}
+            <div class="analysis-suggestion-cards mt-1">
+                <small class="text-muted">Consider: </small>
+                {% for card_name in suggestion.cards_suggested %}
+                <span class="analysis-card-chip">{{ card_name }}</span>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}{# end flagged_turns #}
+
+<!-- All turns summary (collapsed by default) -->
+{% if player_turns %}
+<div class="mt-4">
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allTurnsCollapse" aria-expanded="false" aria-controls="allTurnsCollapse">
+        Show all {{ player_turns|length }} player turns
+    </button>
+    <div class="collapse mt-3" id="allTurnsCollapse">
+        <div class="card">
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Turn</th>
+                            <th>Plays made</th>
+                            <th>Mana used</th>
+                            <th>Life (You / Opp)</th>
+                            <th>Suggestions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for turn in player_turns %}
+                        <tr {% if turn.suggestions %}class="table-warning"{% endif %}>
+                            <td>{{ turn.turn_number }}</td>
+                            <td>
+                                {% if turn.plays_made %}
+                                <small>{{ turn.plays_made|join:", " }}</small>
+                                {% else %}
+                                <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ turn.mana_spent|floatformat:0 }} / {{ turn.mana_available }}</small></td>
+                            <td><small>{{ turn.life_you }} / {{ turn.life_opp }}</small></td>
+                            <td>
+                                {% if turn.suggestions %}
+                                <span class="badge bg-warning text-dark">{{ turn.suggestions|length }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Footer nav -->
+<div class="mt-4 d-flex gap-2">
+    <a href="{% url 'stats:match_replay' match.id %}" class="btn btn-outline-secondary">▶ Replay</a>
+    <a href="{% url 'stats:match_detail' match.id %}" class="btn btn-primary">Back to Match</a>
+</div>
+
+{% endif %}{# end has_data #}
+{% endblock %}

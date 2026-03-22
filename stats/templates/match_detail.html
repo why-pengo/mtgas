@@ -22,6 +22,7 @@
             • {{ match.total_turns|default:"?" }} turns
         </p>
         <a href="{% url 'stats:match_replay' match.id %}" class="btn btn-sm btn-outline-secondary">▶ Replay</a>
+        <a href="{% url 'stats:match_analysis' match.id %}" class="btn btn-sm btn-outline-primary ms-1">🔍 Analyze Plays</a>
     </div>
 </div>
 
