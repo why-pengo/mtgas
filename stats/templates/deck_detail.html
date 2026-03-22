@@ -95,7 +95,22 @@
 
         <!-- Mana Curve -->
         <div class="card mb-4">
-            <div class="card-header">Mana Curve</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Mana Curve
+                <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline text-muted"
+                        data-bs-toggle="popover"
+                        data-bs-trigger="focus"
+                        data-bs-placement="top"
+                        data-bs-html="true"
+                        data-bs-title="Mana Curve"
+                        data-bs-content="<p class='mb-1'><strong>This deck:</strong> Avg CMC {{ deck_analysis.avg_cmc }} &mdash; {{ deck_analysis.curve_shape }} profile</p><p class='mb-1'><strong>Benchmarks:</strong> Aggro &lt; 2.0 &nbsp;|&nbsp; Midrange 2.0&ndash;3.2 &nbsp;|&nbsp; Control 3.2&ndash;4.5 &nbsp;|&nbsp; Ramp 4.5+</p><hr class='my-1'><p class='mb-1'>A lower average CMC means faster, more consistent play. Higher CMC brings powerful late-game spells at the cost of slower starts and riskier opening hands.</p><p class='mb-0 text-muted small'>Cards costing 5+ mana are high risk &mdash; ensure you have enough early plays to survive until you can cast them.</p>"
+                        aria-label="Mana curve info">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-question-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                        <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+                    </svg>
+                </button>
+            </div>
             <div class="card-body">
                 <div id="manaCurveChart"></div>
             </div>
@@ -104,12 +119,67 @@
         <!-- Color Distribution -->
         {% if color_counts %}
         <div class="card mb-4">
-            <div class="card-header">Color Distribution</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Color Distribution
+                <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline text-muted"
+                        data-bs-toggle="popover"
+                        data-bs-trigger="focus"
+                        data-bs-placement="top"
+                        data-bs-html="true"
+                        data-bs-title="Color Distribution"
+                        data-bs-content="<p class='mb-1'><strong>Colored pip requirements:</strong> {{ deck_analysis.pip_summary }}</p><hr class='my-1'><p class='mb-1'>Pip % measures how much mana of each color your spells demand. Your mana base should produce colors in roughly these proportions to avoid getting color-screwed.</p><p class='mb-0 text-muted small'>In multi-color decks, use dual lands, fetch lands, and mana fixers so you have the right colors on the turns that matter most.</p>"
+                        aria-label="Color distribution info">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-question-circle" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                        <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+                    </svg>
+                </button>
+            </div>
             <div class="card-body">
                 <div id="colorDistChart"></div>
             </div>
         </div>
         {% endif %}
+
+        <!-- Deck Analysis / Improvement Suggestions -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Deck Analysis
+                <span class="text-muted small">avg CMC {{ deck_analysis.avg_cmc }} &middot; {{ deck_analysis.curve_shape }}</span>
+            </div>
+            <div class="card-body">
+                {% if deck_analysis.suggestions %}
+                <div class="deck-suggestions">
+                    {% for s in deck_analysis.suggestions %}
+                    <div class="deck-suggestion deck-suggestion--{{ s.severity }}">
+                        <div class="deck-suggestion__header">
+                            <span class="deck-suggestion__badge">{{ s.category }}</span>
+                            <strong class="deck-suggestion__title">{{ s.title }}</strong>
+                        </div>
+                        <p class="deck-suggestion__body">{{ s.body }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill text-success me-1" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                    </svg>
+                    No issues found — this deck looks well-constructed!
+                </p>
+                {% endif %}
+                <div class="deck-copy-dist {% if deck_analysis.suggestions %}mt-3{% endif %}">
+                    <small class="text-muted">
+                        Non-land copy distribution:
+                        {% if deck_analysis.one_ofs %}<span class="me-2">1&times; {{ deck_analysis.one_ofs }} unique</span>{% endif %}
+                        {% if deck_analysis.two_ofs %}<span class="me-2">2&times; {{ deck_analysis.two_ofs }} unique</span>{% endif %}
+                        {% if deck_analysis.three_ofs %}<span class="me-2">3&times; {{ deck_analysis.three_ofs }} unique</span>{% endif %}
+                        {% if deck_analysis.four_ofs %}<span class="me-2">4&times; {{ deck_analysis.four_ofs }} unique</span>{% endif %}
+                        {% if not deck_analysis.one_ofs and not deck_analysis.two_ofs and not deck_analysis.three_ofs and not deck_analysis.four_ofs %}<span class="fst-italic">No card data</span>{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
 
         <!-- Matchups -->
         {% if matchups %}
