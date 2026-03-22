@@ -7,15 +7,27 @@
 
 <div class="card">
     <div class="card-body">
-        <table class="table table-striped">
+        <table class="table table-striped" id="decks-table">
             <thead>
                 <tr>
-                    <th>Deck Name</th>
-                    <th>Format</th>
-                    <th>Games</th>
-                    <th>Wins</th>
-                    <th>Win Rate</th>
-                    <th>Last Played</th>
+                    <th data-sortable data-sort-type="text">
+                        Deck Name <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
+                    <th data-sortable data-sort-type="text">
+                        Format <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
+                    <th data-sortable data-sort-type="number">
+                        Games <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
+                    <th data-sortable data-sort-type="number">
+                        Wins <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
+                    <th data-sortable data-sort-type="number">
+                        Win Rate <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
+                    <th data-sortable data-sort-type="text">
+                        Last Played <span class="sort-indicator" aria-hidden="true">⇅</span>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -28,7 +40,7 @@
                     <td>{{ deck.format|default:"-" }}</td>
                     <td>{{ deck.games }}</td>
                     <td>{{ deck.wins }}</td>
-                    <td>
+                    <td data-sort-value="{{ deck.win_rate }}">
                         {% if deck.games > 0 %}
                         <div class="progress">
                             <div class="progress-bar {% if deck.win_rate >= 50 %}bg-success{% else %}bg-danger{% endif %}"
@@ -40,7 +52,9 @@
                         -
                         {% endif %}
                     </td>
-                    <td>{{ deck.last_played|date:"M d, Y"|default:"-" }}</td>
+                    <td data-sort-value="{{ deck.last_played|date:'Y-m-d'|default:'' }}">
+                        {{ deck.last_played|date:"M d, Y"|default:"-" }}
+                    </td>
                     <td>
                         <a href="{% url 'stats:deck_gallery' deck.id %}" class="btn btn-sm btn-outline-primary" title="View Card Gallery">
                             <i class="bi bi-images"></i> Gallery
@@ -59,5 +73,61 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.getElementById('decks-table');
+    if (!table) return;
+
+    let activeHeader = null;
+    let ascending = true;
+
+    table.querySelectorAll('th[data-sortable]').forEach(function (th, colIndex) {
+        th.addEventListener('click', function () {
+            if (activeHeader === th) {
+                ascending = !ascending;
+            } else {
+                if (activeHeader) {
+                    activeHeader.removeAttribute('data-sort-dir');
+                    activeHeader.querySelector('.sort-indicator').textContent = '⇅';
+                }
+                ascending = true;
+                activeHeader = th;
+            }
+
+            th.setAttribute('data-sort-dir', ascending ? 'asc' : 'desc');
+            th.querySelector('.sort-indicator').textContent = ascending ? '▲' : '▼';
+
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const sortType = th.dataset.sortType || 'text';
+
+            rows.sort(function (a, b) {
+                const cellA = a.cells[colIndex];
+                const cellB = b.cells[colIndex];
+                const rawA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
+                const rawB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
+
+                let valA, valB;
+                if (sortType === 'number') {
+                    valA = parseFloat(rawA) || 0;
+                    valB = parseFloat(rawB) || 0;
+                } else {
+                    valA = rawA.toLowerCase();
+                    valB = rawB.toLowerCase();
+                }
+
+                if (valA < valB) return ascending ? -1 : 1;
+                if (valA > valB) return ascending ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(function (row) { tbody.appendChild(row); });
+        });
+    });
+});
+</script>
 {% endblock %}
 

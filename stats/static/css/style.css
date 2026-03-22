@@ -43,6 +43,34 @@
 }
 
 /* =============================================================================
+   Sortable Table Headers
+   ============================================================================= */
+
+th[data-sortable] {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+th[data-sortable]:hover {
+    background-color: var(--bg-header);
+}
+
+.sort-indicator {
+    display: inline-block;
+    margin-left: 0.3rem;
+    font-size: 0.65rem;
+    opacity: 0.35;
+    vertical-align: middle;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+th[data-sort-dir] .sort-indicator {
+    opacity: 1;
+    color: var(--accent);
+}
+
+/* =============================================================================
    Bootstrap Popover — custom styling
    ============================================================================= */
 
