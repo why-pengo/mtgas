@@ -43,6 +43,51 @@
 }
 
 /* =============================================================================
+   Bootstrap Popover — custom styling
+   ============================================================================= */
+
+.popover {
+    --bs-popover-bg: #06101e;
+    --bs-popover-border-color: var(--accent);
+    --bs-popover-border-width: 1.5px;
+    --bs-popover-header-bg: transparent;
+    --bs-popover-header-color: var(--accent);
+    --bs-popover-body-color: var(--text-primary);
+    --bs-popover-max-width: 320px;
+    --bs-popover-font-size: 0.8rem;
+
+    box-shadow: 0 8px 36px rgb(0 0 0 / 70%), 0 0 0 1px var(--accent);
+}
+
+.popover .popover-header {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid rgb(255 77 109 / 25%);
+}
+
+.popover .popover-body {
+    padding-top: 0.6rem;
+    line-height: 1.55;
+}
+
+/* Arrow border inherits from --bs-popover-border-color automatically */
+
+/* Light mode overrides */
+html[data-theme="light"] .popover {
+    --bs-popover-bg: #fff;
+    --bs-popover-body-color: #212529;
+
+    box-shadow: 0 8px 36px rgb(0 0 0 / 20%), 0 0 0 1.5px var(--accent);
+}
+
+html[data-theme="light"] .popover .popover-header {
+    border-bottom-color: rgb(214 50 81 / 25%);
+}
+
+/* =============================================================================
    Card Preview Popup
    ============================================================================= */
 #card-preview-popup {
