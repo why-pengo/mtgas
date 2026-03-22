@@ -356,11 +356,11 @@ def _compute_deck_suggestions(
 def decks_list(request: HttpRequest) -> HttpResponse:
     """Deck performance overview."""
     decks = Deck.objects.annotate(
-        games=Count("matches", filter=Q(matches__result__isnull=False)),
-        wins=Count("matches", filter=Q(matches__result="win")),
+        games=Count("matches", filter=Q(matches__result__isnull=False), distinct=True),
+        wins=Count("matches", filter=Q(matches__result="win"), distinct=True),
         avg_turns=Avg("matches__total_turns", filter=Q(matches__result__isnull=False)),
         last_played=Max("matches__start_time"),
-        version_count=Count("snapshots"),
+        version_count=Count("snapshots", distinct=True),
     ).order_by("-last_played")
 
     for deck in decks:
@@ -475,22 +475,21 @@ def deck_history(request: HttpRequest, deck_id: int) -> HttpResponse:
     """Timeline of all deck snapshots with sequential diffs."""
     deck = get_object_or_404(Deck, pk=deck_id)
 
-    snapshots = list(
-        DeckSnapshot.objects.filter(deck=deck)
-        .select_related("match")
-        .order_by("match__start_time", "created_at")
-    )
+    snapshots = list(DeckSnapshot.objects.filter(deck=deck).order_by("created_at"))
 
-    # Build (snapshot, diff_from_previous, match) triples
+    # Build (snapshot, diff_from_previous, first_match, match_count) tuples
     history = []
     for i, snap in enumerate(snapshots):
         prev = snapshots[i - 1] if i > 0 else None
         diff = compute_deck_diff(prev, snap)
+        first_match = snap.matches.order_by("start_time").first()
+        match_count = snap.matches.count()
         history.append(
             {
                 "snapshot": snap,
                 "diff": diff,
-                "match": snap.match,
+                "first_match": first_match,
+                "match_count": match_count,
                 "is_first": i == 0,
             }
         )

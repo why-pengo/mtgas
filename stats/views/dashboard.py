@@ -63,36 +63,21 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     show_unknown_warning = unknown_card_count > 0 and (unknown_in_decks or unknown_card_count > 5)
 
     # Recent matches with deck change indicators
-    recent_matches_qs = Match.objects.select_related("deck", "deck_snapshot").order_by(
-        "-start_time"
-    )[:10]
+    recent_matches_qs = Match.objects.select_related("deck", "snapshot").order_by("-start_time")[
+        :10
+    ]
     recent_matches = list(recent_matches_qs)
 
-    # Annotate each match with a deck_changed flag:
-    # True when the snapshot's card set differs from the previous snapshot for the same deck.
+    # Annotate each match with deck_changed / is_first_snapshot flags.
+    # With snapshot deduplication, a new snapshot PK means the deck changed.
     _deck_prev_snapshot: dict[int, int] = {}  # deck_id → previous snapshot pk
     for match in reversed(recent_matches):
-        snap = getattr(match, "deck_snapshot", None)
+        snap = match.snapshot
         deck = match.deck
         if snap and deck:
             prev_pk = _deck_prev_snapshot.get(deck.pk)
-            if prev_pk is None:
-                match.deck_changed = False
-                match.is_first_snapshot = True
-            else:
-                # Compare card sets (grp_id sorted tuples) between prev and current snapshot
-                from ..models import DeckCard as _DeckCard
-
-                prev_cards = frozenset(
-                    _DeckCard.objects.filter(snapshot_id=prev_pk).values_list(
-                        "card_id", "quantity", "is_sideboard"
-                    )
-                )
-                curr_cards = frozenset(
-                    snap.cards.values_list("card_id", "quantity", "is_sideboard")
-                )
-                match.deck_changed = prev_cards != curr_cards
-                match.is_first_snapshot = False
+            match.deck_changed = prev_pk is not None and snap.pk != prev_pk
+            match.is_first_snapshot = prev_pk is None
             _deck_prev_snapshot[deck.pk] = snap.pk
         else:
             match.deck_changed = False

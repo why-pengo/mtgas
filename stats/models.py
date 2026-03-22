@@ -77,7 +77,7 @@ class Deck(models.Model):
         return self.name
 
     def latest_snapshot(self) -> DeckSnapshot | None:
-        return self.snapshots.order_by("-created_at").select_related("match").first()
+        return self.snapshots.order_by("-created_at").first()
 
     def total_cards(self) -> int:
         snap = self.latest_snapshot()
@@ -142,6 +142,13 @@ class Match(models.Model):
 
     # Import tracking
     imported_at = models.DateTimeField(auto_now_add=True)
+    snapshot = models.ForeignKey(
+        "DeckSnapshot",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches",
+    )
 
     class Meta:
         db_table = "matches"
@@ -166,16 +173,9 @@ class Match(models.Model):
 
 
 class DeckSnapshot(models.Model):
-    """Records the exact deck composition used in a specific match."""
+    """Records a distinct deck composition. Shared by all matches that used the same list."""
 
     deck = models.ForeignKey(Deck, on_delete=models.CASCADE, related_name="snapshots")
-    match = models.OneToOneField(
-        Match,
-        on_delete=models.CASCADE,
-        related_name="deck_snapshot",
-        null=True,
-        blank=True,
-    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

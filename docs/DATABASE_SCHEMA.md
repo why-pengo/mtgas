@@ -15,18 +15,17 @@ The database uses SQLite (via Django ORM) and consists of 9 main tables that tra
 │ grp_id (PK)      │       │ id (PK)           │◄──────│ id (PK)         │
 │ name             │       │ deck_id (unique)  │       │ match_id        │
 │ mana_cost        │       │ name              │       │ deck_id (FK)    │
-│ cmc              │       │ format            │       │ result          │
-│ type_line        │       │ created_at        │       │ opponent        │
-│ colors           │       └──────────────────┘       │ start_time      │
-│ rarity           │               │                  │ duration        │
-│ is_token         │               │ (1:many)         └─────────────────┘
-│ object_type      │               ▼                           │
-│ source_grp_id    │       ┌──────────────────┐               │ (1:1)
-└──────────────────┘       │  deck_snapshots  │◄──────────────┘
+│ cmc              │       │ format            │       │ snapshot_id(FK) │──┐
+│ type_line        │       │ created_at        │       │ result          │  │
+│ colors           │       └──────────────────┘       │ opponent        │  │
+│ rarity           │               │                  │ start_time      │  │
+│ is_token         │               │ (1:many)         │ duration        │  │
+│ object_type      │               ▼                  └─────────────────┘  │
+│ source_grp_id    │       ┌──────────────────┐                            │
+└──────────────────┘       │  deck_snapshots  │◄───────────────────────────┘
         ▲                  ├──────────────────┤
         │                  │ id (PK)          │
         │                  │ deck_id (FK)     │
-        │                  │ match_id (1:1 FK)│
         │                  │ created_at       │
         │                  └──────────────────┘
         │                           │
@@ -115,19 +114,16 @@ Stores deck identity. A deck is the **anchor** for all versions of the same Aren
 
 ### 3. deck_snapshots
 
-Records the exact deck composition used for a specific match. A new snapshot is created on every import, even if the cards have not changed, enabling full deck history.
+Records a distinct deck composition. A new snapshot is only created when the deck's card list changes. Multiple matches that were played with the same cards share a single snapshot row — import deduplication compares incoming card sets against the latest snapshot and reuses it when there are no changes.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER (PK) | Auto-increment ID |
 | `deck_id` | INTEGER (FK) | Reference to decks.id (CASCADE delete) |
-| `match_id` | INTEGER (FK, unique) | OneToOne reference to matches.id (CASCADE delete); nullable |
-| `created_at` | DATETIME | Snapshot creation timestamp |
+| `created_at` | DATETIME | Snapshot creation timestamp (time the new version was first seen) |
 
 **Constraints:**
 - Foreign key to `decks(id)` with CASCADE delete
-- Unique (one snapshot per match)
-- `match_id` is nullable (test fixtures may omit it)
 
 ### 4. deck_cards
 
@@ -175,6 +171,7 @@ Stores match/game information.
 | `duration_seconds` | INTEGER | Match duration in seconds |
 | `total_turns` | INTEGER | Total turns played |
 | `imported_at` | DATETIME | When imported to database |
+| `snapshot_id` | INTEGER (FK) | Reference to deck_snapshots.id (SET NULL on delete); the exact card list used in this match |
 
 **Indexes:**
 - Unique index on `match_id`
@@ -271,7 +268,7 @@ Tracks log file import history.
 ## Key Relationships
 
 1. **Deck → DeckSnapshots**: One-to-many (one deck identity, many versioned snapshots)
-2. **Match → DeckSnapshot**: One-to-one (each match has exactly one snapshot of the deck used)
+2. **Match → DeckSnapshot**: Many-to-one FK (`Match.snapshot`). Multiple matches share the same snapshot when the deck hasn't changed. A new snapshot is created only when the card composition differs from the previous one.
 3. **DeckSnapshot → DeckCards**: One-to-many (snapshot holds mainboard + sideboard)
 4. **DeckCard → Card**: Many-to-one (card metadata)
 5. **Match → Deck**: Many-to-one FK for fast identity lookups (does not change when deck evolves)
@@ -329,10 +326,10 @@ ORDER BY versions DESC;
 ### Cards in a Specific Match's Deck (mainboard)
 ```sql
 SELECT c.name, dc.quantity
-FROM deck_cards dc
-JOIN deck_snapshots ds ON dc.snapshot_id = ds.id
+FROM matches m
+JOIN deck_snapshots ds ON m.snapshot_id = ds.id
+JOIN deck_cards dc ON dc.snapshot_id = ds.id
 JOIN cards c ON dc.card_grp_id = c.grp_id
-JOIN matches m ON ds.match_id = m.id
 WHERE m.match_id = '<arena-match-uuid>'
   AND dc.is_sideboard = 0
 ORDER BY c.name;

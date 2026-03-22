@@ -357,15 +357,17 @@ from src.services.import_service import (
 
 ## Import Service: Deck Versioning
 
-Each import creates a `DeckSnapshot` tied to the match being imported. This records the exact deck composition (mainboard + sideboard) at the time of the match, enabling full deck history.
+Each import calls `_ensure_deck_snapshot()` which creates or **reuses** a `DeckSnapshot`. A new snapshot is only created when the deck composition (mainboard + sideboard) has actually changed since the previous import. Matches that use the same card list share one snapshot row.
 
 ### Order of operations in `_ensure_deck_snapshot()`
 
 1. `Deck.objects.get_or_create(deck_id=...)` — create (or fetch) the deck identity anchor.
 2. `Match.objects.create(...)` — create the match record.
-3. `DeckSnapshot.objects.create(deck=deck, match=match)` — create the snapshot.
-4. `_ensure_cards(real_cards, special_objects)` — always called for every card in the snapshot, even if the deck was seen before. This guarantees newly added cards are resolved against Scryfall on every import, not just the first.
-5. `DeckCard.objects.bulk_create([...])` — insert mainboard rows (`is_sideboard=False`) then sideboard rows (`is_sideboard=True`).
+3. Build a `frozenset` of `(card_grp_id, quantity, is_sideboard)` tuples from the incoming deck list.
+4. Load `deck.latest_snapshot()` and compare its card frozenset against the incoming one.
+   - **Same** → reuse: set `match.snapshot = latest_snapshot` and save. No new snapshot row.
+   - **Different (or no previous snapshot)** → create a new `DeckSnapshot`, bulk-create `DeckCard` rows, then set `match.snapshot = new_snapshot`.
+5. `_ensure_cards(real_cards, special_objects)` — always called for every card in the deck list, even when reusing a snapshot. This guarantees newly added cards are resolved against Scryfall on every import, not just the first.
 
 ### Deck diff utility
 

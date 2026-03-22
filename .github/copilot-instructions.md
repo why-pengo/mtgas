@@ -29,7 +29,7 @@ make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
 .venv/bin/pytest tests/test_parser.py     # Run specific test file
 .venv/bin/pytest tests/test_models.py::TestMatchModel  # Run specific test class
 .venv/bin/pytest -k "test_parse_match"    # Run tests matching pattern
-.venv/bin/pytest --cov=stats --cov=src    # Run with coverage
+.venv/bin/pytest --cov=stats --cov=src --cov=cards  # Run with coverage
 ```
 
 ### Code Quality
@@ -59,7 +59,16 @@ make ci          # Run check + test (use before commits)
    - `templates/` - Django templates
    - `static/` - CSS (`css/style.css`) and JS (`js/app.js`, `js/charts.js`)
 
-3. **`mtgas_project/`** - Django project configuration
+3. **`cards/`** - Django app for card image recognition
+   - `models.py` - `CardImage` model (upload, status, FK to `stats.Card`, phash match distance)
+   - `views.py` - Index, upload, detail, and photography guide views
+   - `forms.py` - `CardImageUploadForm` with 10 MB size validation
+   - `tasks.py` - Celery task `match_card_image`: computes phash, finds best match via Hamming distance (threshold: 12)
+   - `urls.py` - Mounted at `/cards/` (app_name = `cards`)
+   - `management/commands/build_phash_index.py` - CLI to batch-compute phashes for all `stats.Card` records
+   - `templates/cards/` - `index.html`, `upload.html`, `card_detail.html`
+
+4. **`mtgas_project/`** - Django project configuration
    - `settings.py` - Django settings (INSTALLED_APPS, DATABASE, etc.)
    - `urls.py` - Root URL configuration
    - `wsgi.py` - WSGI entry point
@@ -182,12 +191,35 @@ LifeChange, ZoneTransfer
 4. Add to Makefile if used frequently
 5. Consider if functionality should also be exposed via web UI (see `import_log` view for example)
 
+## Installed Skills — Project Configuration
+
+### `web-design-reviewer`
+- Dev server: `make run` → **`http://127.0.0.1:8000`**
+- All styles live in `stats/static/css/style.css` — never add `<style>` blocks in templates or `style="..."` inline attributes
+- CSS color notation: `rgb(0 0 0 / 50%)` — never `rgba(0,0,0,0.5)`
+- After any CSS fix: run `make lint-css` and resolve all errors
+- Allowed inline-style exceptions (do not flag or remove):
+  - Django template variable widths: `style="width: {{ value }}%"` on progress bars
+  - JS-controlled state: `style="display:none"` on elements toggled by JavaScript
+- Templates: `stats/templates/`, `cards/templates/`; JS: `stats/static/js/`
+
+### `polyglot-test-agent`
+- Run tests with `.venv/bin/pytest` (not bare `pytest`)
+- Coverage targets: `--cov=stats --cov=src --cov=cards`
+- Test naming: `test_<function>_<scenario>`
+- Fixtures in `conftest.py`; test database is in-memory SQLite
+
+### `webapp-testing`
+- Dev server: `make run` → `http://127.0.0.1:8000`
+- Key routes: `/` (dashboard), `/import/`, `/card-data/`, `/cards/`, `/matches/`, `/decks/`
+
 ## Development Workflow
 
 1. **Branch**: Use feature branches (not main)
 2. **Format**: Run `make format` before committing
 3. **Test**: Run `make ci` to check format, lint, and tests
-4. **Commit**: Use conventional commit prefixes:
+4. **Docs**: After all changes, review and update any markdown docs (`README.md`, `CONTRIBUTING.md`, `QUICKSTART.md`, `docs/`) that are affected by or describe the changed behavior
+5. **Commit**: Use conventional commit prefixes:
    - `feat:` - New features
    - `fix:` - Bug fixes
    - `refactor:` - Code refactoring
@@ -196,6 +228,11 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
+- **Card image recognition** (`cards/` app): Upload a card photo to `/cards/upload/`; a Celery task (`match_card_image`) computes a perceptual hash (phash) and finds the closest `stats.Card` by Hamming distance (threshold: 12)
+  - Requires Celery worker running alongside Django
+  - Before matching works, populate phashes: `python manage.py build_phash_index` (downloads images from Scryfall URLs stored in `stats.Card.image_uri`)
+  - `CardImage.status` lifecycle: `pending` → `processing` → `matched` | `unmatched` | `failed`
+  - Photography guide available at `/cards/photography-guide/`
 - **Import logging**: Comprehensive logging added to import process for debugging
   - Logger name: `stats.views`
   - INFO level: Match-level progress, import summaries

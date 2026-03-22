@@ -7,7 +7,9 @@ A Django-based application to track your Magic: The Gathering Arena game statist
 ## Features
 
 - **Match Tracking**: Records all match details including opponent, result, deck used, duration, and format
-- **Deck Performance**: Analyze win rates and performance for each deck
+- **Deck Performance**: Analyze win rates, mana curve, color distribution, and get AI-style improvement suggestions
+- **Deck Versioning**: Snapshots track exact card composition per version — new snapshots are only created when the deck actually changes, so multiple matches with the same list share one snapshot
+- **Deck History**: Visual diff showing exactly what cards were added/removed between versions, with match count per version
 - **Game Replay**: View detailed game actions, life changes, and card plays
 - **Statistics Dashboard**: Visualize win rates over time, format performance, and more
 - **D3.js Visualizations**: Interactive charts including:
@@ -140,6 +142,8 @@ pytest --cov=stats --cov=src
 - `test_scryfall.py`: Scryfall bulk data service tests  
 - `test_models.py`: Django model and database tests
 - `test_views.py`: Web interface tests
+- `test_deck_analysis.py`: Mana curve, color pip parsing, deck improvement suggestions
+- `test_deck_versioning.py`: DeckSnapshot deduplication and diff utility
 
 ## Project Structure
 
@@ -205,9 +209,10 @@ mtgas/
 
 ### Core Tables
 
-- **matches**: Game results, opponents, timing
-- **decks**: Deck names and compositions  
-- **deck_cards**: Cards in each deck
+- **matches**: Game results, opponents, timing, FK to active deck snapshot
+- **decks**: Deck identity anchor (UUID from Arena)
+- **deck_snapshots**: One row per distinct card composition; shared across matches that used the same list
+- **deck_cards**: Cards in a specific snapshot (mainboard and sideboard)
 - **cards**: Card metadata from Scryfall
 - **game_actions**: Individual plays during games
 - **life_changes**: Life total tracking

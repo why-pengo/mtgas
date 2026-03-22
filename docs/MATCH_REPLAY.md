@@ -151,12 +151,12 @@ Both the player's and opponent's life changes are captured by the parser and sto
 | `stats/views/matches.py` — `_build_zone_labels()` | Infers zone roles from transfer statistics |
 | `stats/views/matches.py` — `_zone_verb()` | Maps zone-pair transitions to event verbs |
 | `stats/views/matches.py` — `match_replay()` | View: builds step list, serialises to JSON; handles `TokenCreated` category |
-| `stats/views/matches.py` — `match_detail()` | Timeline view; uses `match.deck_snapshot.cards` for the deck panel; handles `TokenCreated` category |
+| `stats/views/matches.py` — `match_detail()` | Timeline view; uses `match.snapshot.cards` for the deck panel; handles `TokenCreated` category |
 | `stats/templates/match_replay.html` | Template: JS step-through UI with TOKEN badge |
 | `src/parser/log_parser.py` — `_process_game_state_message()` | Parser: extracts `AnnotationType_ZoneTransfer`; emits synthetic entries for `AnnotationType_TokenCreated` |
 | `stats/models.py` — `ZoneTransfer` | ORM model for zone transfer records (`category` field carries `"TokenCreated"` for synthetic entries) |
 | `stats/models.py` — `Card` | `is_token`, `object_type`, `source_grp_id` fields identify token/non-card game objects |
-| `stats/models.py` — `DeckSnapshot` | Per-match deck composition; `match_detail` reads cards from `match.deck_snapshot.cards` |
+| `stats/models.py` — `DeckSnapshot` | One row per distinct deck composition; `Match.snapshot` FK links matches to their snapshot; `match_detail` reads cards from `match.snapshot.cards` |
 | `src/services/import_service.py` — `_collect_card_ids()` | Splits game object IDs into real cards vs. special objects; `GameObjectType_Omen` override discards prior Card classification |
 | `src/services/import_service.py` — `_generate_token_name()` | Builds human-readable token names from game-state data |
 | `src/services/import_service.py` — `_ensure_cards()` Omen path | Resolves Omen back-face name via `grpId - 1` front-face lookup |

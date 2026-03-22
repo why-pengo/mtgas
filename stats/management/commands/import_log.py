@@ -3,6 +3,7 @@ Django management command to import MTG Arena log files.
 
 Batch imports matches from Player.log after game sessions.
 Tracks imports using match_id to avoid duplicates.
+Accepts one or more log file paths (shell glob expansion is supported).
 """
 
 import os
@@ -44,10 +45,15 @@ from stats.models import (  # noqa: E402
 
 
 class Command(BaseCommand):
-    help = "Import matches from MTG Arena Player.log file (batch import after sessions)"
+    help = "Import matches from one or more MTG Arena Player.log files (supports shell globs)"
 
     def add_arguments(self, parser):
-        parser.add_argument("log_file", help="Path to Player.log file")
+        parser.add_argument(
+            "log_files",
+            nargs="+",
+            metavar="log_file",
+            help="Path(s) to Player.log file(s). Shell globs are expanded by the shell.",
+        )
         parser.add_argument(
             "--force", action="store_true", help="Re-import all matches, even if already imported"
         )
@@ -58,35 +64,55 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        log_path = options["log_file"]
+        log_paths = options["log_files"]
         force = options["force"]
         download_cards = options["download_cards"]
 
-        if not os.path.exists(log_path):
-            raise CommandError(f"Log file not found: {log_path}")
+        # Validate all paths up front
+        missing = [p for p in log_paths if not os.path.exists(p)]
+        if missing:
+            raise CommandError(f"Log file(s) not found: {', '.join(missing)}")
 
-        # Get file info
+        scryfall = get_scryfall()
+        if download_cards:
+            self.stdout.write("Downloading Scryfall bulk data...")
+            scryfall.ensure_bulk_data(force_download=True)
+        else:
+            scryfall.ensure_bulk_data()
+
+        total_imported = 0
+        total_skipped = 0
+
+        for log_path in log_paths:
+            if len(log_paths) > 1:
+                self.stdout.write(f"\n{'─' * 60}")
+                self.stdout.write(f"File: {log_path}")
+
+            imported, skipped = self._import_file(log_path, force, scryfall)
+            total_imported += imported
+            total_skipped += skipped
+
+        if len(log_paths) > 1:
+            self.stdout.write(f"\n{'═' * 60}")
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"All files done: {total_imported} imported, {total_skipped} skipped "
+                    f"across {len(log_paths)} file(s)"
+                )
+            )
+
+    def _import_file(self, log_path: str, force: bool, scryfall) -> tuple[int, int]:
+        """Import a single log file. Returns (imported_count, skipped_count)."""
         file_stat = os.stat(log_path)
         file_size = file_stat.st_size
         file_modified = datetime.fromtimestamp(file_stat.st_mtime, tz=dt_timezone.utc)
 
-        # Create import session
         session = ImportSession.objects.create(
             log_file=log_path, file_size=file_size, file_modified=file_modified, status="running"
         )
-
-        # Store session for use in import methods
         self.import_session = session
 
         try:
-            # Ensure card data is available
-            scryfall = get_scryfall()
-            if download_cards:
-                self.stdout.write("Downloading Scryfall bulk data...")
-                scryfall.ensure_bulk_data(force_download=True)
-            else:
-                scryfall.ensure_bulk_data()
-
             # Get existing match IDs to skip
             existing_match_ids: Set[str] = set()
             if not force:
@@ -129,15 +155,16 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"\nImport complete: {imported_count} imported, {skipped_count} skipped"
+                    f"Import complete: {imported_count} imported, {skipped_count} skipped"
                 )
             )
+            return imported_count, skipped_count
 
         except Exception as e:
             session.status = "failed"
             session.error_message = str(e)
             session.save()
-            raise CommandError(f"Import failed: {e}")
+            raise CommandError(f"Import failed ({log_path}): {e}")
 
     @transaction.atomic
     def _import_match(self, match_data: MatchData, scryfall):
@@ -189,7 +216,7 @@ class Command(BaseCommand):
             total_turns=match_data.total_turns,
         )
 
-        # Create deck snapshot for this match (every match gets its own snapshot)
+        # Create deck snapshot for this match, reusing if deck hasn't changed
         if deck and (match_data.deck_cards or match_data.deck_sideboard):
             self._ensure_deck_snapshot(match_data, deck, match, scryfall)
 
@@ -211,22 +238,44 @@ class Command(BaseCommand):
     def _ensure_deck_snapshot(
         self, match_data: MatchData, deck: Deck, match: Match, scryfall
     ) -> DeckSnapshot:
-        """Create a DeckSnapshot for this match, ensuring all cards are in the DB."""
-        # Collect all card IDs from the current deck list (mainboard + sideboard)
+        """Create or reuse a DeckSnapshot. A new snapshot is only created when the deck
+        composition changes relative to the most recent snapshot for this deck."""
+        # Ensure every card in this deck list exists in the cards table
         all_deck_card_ids: dict[int, dict] = {}
         for card in match_data.deck_cards + match_data.deck_sideboard:
             cid = card.get("cardId")
             if cid:
                 all_deck_card_ids.setdefault(cid, {})
-
-        # Ensure every card in this snapshot exists in the cards table
         if all_deck_card_ids:
             self._ensure_cards(all_deck_card_ids, {}, scryfall, match, deck)
 
-        # Create the snapshot
-        snapshot = DeckSnapshot.objects.create(deck=deck, match=match)
+        # Build a frozenset representing this deck composition for comparison
+        incoming: set[tuple] = set()
+        for card_data in match_data.deck_cards:
+            cid = card_data.get("cardId")
+            qty = card_data.get("quantity", 1)
+            if cid:
+                incoming.add((cid, qty, False))
+        for card_data in match_data.deck_sideboard:
+            cid = card_data.get("cardId")
+            qty = card_data.get("quantity", 1)
+            if cid:
+                incoming.add((cid, qty, True))
+        incoming_fs = frozenset(incoming)
 
-        # Populate mainboard
+        # Check if the latest snapshot for this deck matches the incoming list
+        latest = deck.latest_snapshot()
+        if latest is not None:
+            existing_fs = frozenset(latest.cards.values_list("card_id", "quantity", "is_sideboard"))
+            if existing_fs == incoming_fs:
+                # Reuse the existing snapshot — deck hasn't changed
+                match.snapshot = latest
+                match.save(update_fields=["snapshot"])
+                return latest
+
+        # Deck changed (or no prior snapshot) — create a new one
+        snapshot = DeckSnapshot.objects.create(deck=deck)
+
         snapshot_cards = []
         for card_data in match_data.deck_cards:
             card_id = card_data.get("cardId")
@@ -242,7 +291,6 @@ class Command(BaseCommand):
                 except Card.DoesNotExist:
                     pass
 
-        # Populate sideboard
         for card_data in match_data.deck_sideboard:
             card_id = card_data.get("cardId")
             quantity = card_data.get("quantity", 1)
@@ -256,6 +304,8 @@ class Command(BaseCommand):
                     pass
 
         DeckCard.objects.bulk_create(snapshot_cards, ignore_conflicts=True)
+        match.snapshot = snapshot
+        match.save(update_fields=["snapshot"])
         return snapshot
 
     def _collect_card_ids(self, match_data: MatchData) -> tuple[dict[int, dict], dict[int, dict]]:

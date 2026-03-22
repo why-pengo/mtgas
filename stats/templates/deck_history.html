@@ -26,7 +26,7 @@
 {% if history %}
 <div class="deck-history-timeline">
     {% for entry in history %}
-    {% with snap=entry.snapshot match=entry.match diff=entry.diff %}
+    {% with snap=entry.snapshot first_match=entry.first_match diff=entry.diff %}
     <div class="deck-history-entry card mb-3{% if diff.has_changes %} deck-history-changed{% endif %}">
         <div class="card-header d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-2">
@@ -37,26 +37,27 @@
                 {% else %}
                     <span class="badge bg-secondary">Unchanged</span>
                 {% endif %}
-                {% if match %}
+                <span class="badge bg-dark">{{ entry.match_count }} match{{ entry.match_count|pluralize }}</span>
+                {% if first_match %}
                     <span>
-                        vs <strong>{{ match.opponent_name|default:"Unknown" }}</strong>
+                        vs <strong>{{ first_match.opponent_name|default:"Unknown" }}</strong>
                     </span>
-                    {% if match.result == "win" %}
+                    {% if first_match.result == "win" %}
                         <span class="badge bg-success">Win</span>
-                    {% elif match.result == "loss" %}
+                    {% elif first_match.result == "loss" %}
                         <span class="badge bg-danger">Loss</span>
-                    {% elif match.result %}
-                        <span class="badge bg-secondary">{{ match.result|capfirst }}</span>
+                    {% elif first_match.result %}
+                        <span class="badge bg-secondary">{{ first_match.result|capfirst }}</span>
                     {% endif %}
                 {% endif %}
             </div>
             <div class="text-muted small">
-                {% if match and match.start_time %}
-                    {{ match.start_time|date:"M j, Y" }}
+                {% if first_match and first_match.start_time %}
+                    {{ first_match.start_time|date:"M j, Y" }}
                 {% endif %}
                 <span class="ms-2">{{ snap.total_cards }} MB{% if snap.sideboard_count %} / {{ snap.sideboard_count }} SB{% endif %}</span>
-                {% if match %}
-                <a href="{% url 'stats:match_detail' match.id %}" class="ms-2 btn btn-sm btn-outline-secondary py-0">View Match</a>
+                {% if first_match %}
+                <a href="{% url 'stats:match_detail' first_match.id %}" class="ms-2 btn btn-sm btn-outline-secondary py-0">View Match</a>
                 {% endif %}
             </div>
         </div>

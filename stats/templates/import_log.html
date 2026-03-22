@@ -5,7 +5,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8 offset-md-2">
-        <h1 class="mb-4">Import Log File</h1>
+        <h1 class="mb-4">Import Log Files</h1>
 
         {% if messages %}
             {% for message in messages %}
@@ -23,7 +23,7 @@
                     
                     <div class="mb-4">
                         <label for="log_file" class="form-label">
-                            <strong>Select Player.log File</strong>
+                            <strong>Select Player.log File(s)</strong>
                         </label>
                         <input 
                             type="file" 
@@ -31,10 +31,11 @@
                             id="log_file" 
                             name="log_file" 
                             accept=".log,.txt"
+                            multiple
                             required
                         >
                         <div class="form-text">
-                            Upload your MTG Arena Player.log file to import match data.
+                            Upload one or more MTG Arena Player.log files. Hold <kbd>Ctrl</kbd>/<kbd>⌘</kbd> to select multiple files.
                         </div>
                     </div>
 
@@ -54,7 +55,7 @@
 
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg">
-                            Import Log File
+                            Import Log File(s)
                         </button>
                         <a href="{% url 'stats:import_sessions' %}" class="btn btn-secondary">
                             View Import History

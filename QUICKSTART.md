@@ -96,7 +96,8 @@ Run `make help` to see all available commands:
 
 ### Database (Django ORM with SQLite)
 - **Match tracking** by `match_id` (unique identifier from Arena)
-- **Deck storage** with card compositions
+- **Deck storage** with card compositions; snapshots deduplicated — new version only on change
+- **Deck analysis**: mana curve, color distribution, improvement suggestions
 - **Game actions** (casts, plays, attacks, blocks)
 - **Life changes** over the course of games
 - **Zone transfers** (draws, plays, discards)
@@ -114,9 +115,10 @@ Run `make help` to see all available commands:
 
 ### Web Interface (Django)
 - **Dashboard**: Win rate, top decks, format stats, recent matches
-- **Match History**: Filterable list with pagination
+- **Match History**: Filterable, sortable list with pagination
 - **Match Details**: Turn-by-turn actions, life chart
-- **Deck Performance**: Win rates, mana curve, matchups
+- **Deck Performance**: Win rates, mana curve, color distribution, improvement suggestions
+- **Deck History**: Visual diff of card changes between versions, match count per version
 - **Import Sessions**: Track import history
 
 ### D3.js Visualizations

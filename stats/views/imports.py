@@ -45,125 +45,130 @@ logger = logging.getLogger("stats.views")
 
 
 def import_log(request: HttpRequest) -> HttpResponse:
-    """Import log file via web UI."""
+    """Import one or more log files via web UI."""
     if request.method == "POST":
-        # Check if file was uploaded
-        log_file = request.FILES.get("log_file")
+        log_files = request.FILES.getlist("log_file")
         force = request.POST.get("force") == "on"
 
-        if not log_file:
+        if not log_files:
             messages.error(request, "No log file uploaded.")
             return redirect("stats:import_log")
 
-        # Save uploaded file temporarily
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".log") as tmp_file:
-            for chunk in log_file.chunks():
-                tmp_file.write(chunk)
-            tmp_path = tmp_file.name
-
         try:
-            # Get file info
-            file_size = os.path.getsize(tmp_path)
-            file_modified = datetime.fromtimestamp(os.path.getmtime(tmp_path), tz=dt_timezone.utc)
-
-            logger.info(f"Starting import from uploaded file: {log_file.name} ({file_size} bytes)")
-
-            # Create import session
-            session = ImportSession.objects.create(
-                log_file=log_file.name,
-                file_size=file_size,
-                file_modified=file_modified,
-                status="running",
-            )
-            logger.info(f"Created import session: {session.id}")
-
-            # Ensure card data is available
             scryfall = get_scryfall()
             scryfall.ensure_bulk_data()
             logger.info("Card data ready")
-
-            # Get existing match IDs to skip
-            existing_match_ids = set()
-            if not force:
-                existing_match_ids = set(Match.objects.values_list("match_id", flat=True))
-                logger.info(f"Found {len(existing_match_ids)} existing matches in database")
-
-            # Parse log file
-            logger.info("Parsing log file...")
-            parser = MTGALogParser(tmp_path)
-            matches = parser.parse_matches()
-
-            # Import matches
-            imported_count = 0
-            skipped_count = 0
-            errors = []
-
-            for match_data in matches:
-                match_id = match_data.match_id
-
-                if not force and match_id in existing_match_ids:
-                    logger.debug(f"Skipping existing match: {match_id}")
-                    skipped_count += 1
-                    continue
-
-                try:
-                    logger.info(f"Importing match: {match_id}")
-                    _import_match(match_data, scryfall, session)
-                    imported_count += 1
-                    logger.debug(f"Successfully imported match: {match_id}")
-                except Exception as e:
-                    error_msg = f"Match {match_id[:8]}: {str(e)}"
-                    logger.error(f"Failed to import match {match_id}: {e}", exc_info=True)
-                    errors.append(error_msg)
-                    if len(errors) <= 5:  # Only store first 5 errors
-                        continue
-
-            logger.info(
-                f"Import complete: {imported_count} imported, {skipped_count} skipped, {len(errors)} errors"
-            )
-
-            # Update session
-            session.matches_imported = imported_count
-            session.matches_skipped = skipped_count
-            session.status = "completed" if not errors else "completed_with_errors"
-            session.completed_at = timezone.now()
-            if errors:
-                session.error_message = "; ".join(errors[:5])
-            session.save()
-
-            # Show success message
-            if imported_count > 0:
-                messages.success(
-                    request,
-                    f"Successfully imported {imported_count} matches (skipped {skipped_count}).",
-                )
-            else:
-                messages.warning(
-                    request, f"No new matches found. Skipped {skipped_count} existing matches."
-                )
-
-            if errors:
-                messages.warning(request, f"Encountered {len(errors)} errors during import.")
-                for error in errors[:3]:  # Show first 3 errors
-                    messages.error(request, error)
-
         except Exception as e:
-            if "session" in locals():
-                session.status = "failed"
-                session.error_message = str(e)
-                session.save()
-            messages.error(request, f"Import failed: {str(e)}")
-        finally:
-            # Clean up temp file
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+            messages.error(request, f"Failed to load card data: {e}")
+            return redirect("stats:import_log")
+
+        total_imported = total_skipped = total_errors = 0
+
+        for log_file in log_files:
+            imp, skp, errs = _process_uploaded_file(log_file, force, scryfall)
+            total_imported += imp
+            total_skipped += skp
+            total_errors += errs
+
+        file_word = f"{len(log_files)} file{'s' if len(log_files) > 1 else ''}"
+        if total_imported > 0:
+            messages.success(
+                request,
+                f"Imported {total_imported} matches from {file_word} (skipped {total_skipped}).",
+            )
+        else:
+            messages.warning(
+                request,
+                f"No new matches found across {file_word}. Skipped {total_skipped} existing.",
+            )
+        if total_errors:
+            messages.warning(request, f"Encountered {total_errors} errors during import.")
 
         return redirect("stats:import_sessions")
 
     # GET request - show upload form
     return render(request, "import_log.html")
+
+
+def _process_uploaded_file(log_file, force: bool, scryfall) -> tuple[int, int, int]:
+    """Write one uploaded file to a temp path, import it, return (imported, skipped, errors)."""
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".log") as tmp_file:
+        for chunk in log_file.chunks():
+            tmp_file.write(chunk)
+        tmp_path = tmp_file.name
+
+    try:
+        file_size = os.path.getsize(tmp_path)
+        file_modified = datetime.fromtimestamp(os.path.getmtime(tmp_path), tz=dt_timezone.utc)
+
+        logger.info(f"Starting import from uploaded file: {log_file.name} ({file_size} bytes)")
+
+        session = ImportSession.objects.create(
+            log_file=log_file.name,
+            file_size=file_size,
+            file_modified=file_modified,
+            status="running",
+        )
+        logger.info(f"Created import session: {session.id}")
+
+        existing_match_ids = set()
+        if not force:
+            existing_match_ids = set(Match.objects.values_list("match_id", flat=True))
+            logger.info(f"Found {len(existing_match_ids)} existing matches in database")
+
+        logger.info("Parsing log file...")
+        parser = MTGALogParser(tmp_path)
+        matches = parser.parse_matches()
+
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+
+        for match_data in matches:
+            match_id = match_data.match_id
+
+            if not force and match_id in existing_match_ids:
+                logger.debug(f"Skipping existing match: {match_id}")
+                skipped_count += 1
+                continue
+
+            try:
+                logger.info(f"Importing match: {match_id}")
+                _import_match(match_data, scryfall, session)
+                imported_count += 1
+                logger.debug(f"Successfully imported match: {match_id}")
+            except Exception as e:
+                error_msg = f"Match {match_id[:8]}: {str(e)}"
+                logger.error(f"Failed to import match {match_id}: {e}", exc_info=True)
+                errors.append(error_msg)
+
+        logger.info(
+            f"Import complete: {imported_count} imported, {skipped_count} skipped, "
+            f"{len(errors)} errors"
+        )
+
+        session.matches_imported = imported_count
+        session.matches_skipped = skipped_count
+        session.status = "completed" if not errors else "completed_with_errors"
+        session.completed_at = timezone.now()
+        if errors:
+            session.error_message = "; ".join(errors[:5])
+        session.save()
+
+        return imported_count, skipped_count, len(errors)
+
+    except Exception as e:
+        if "session" in dir():
+            session.status = "failed"
+            session.error_message = str(e)
+            session.save()
+        logger.error(f"Import failed for {log_file.name}: {e}", exc_info=True)
+        return 0, 0, 1
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 def card_data(request: HttpRequest) -> HttpResponse:
@@ -320,9 +325,9 @@ def _import_match(
     )
     logger.debug(f"[{match_id}] Match record created: {match.id}")
 
-    # Create deck snapshot for this match (every match gets its own snapshot)
+    # Create deck snapshot for this match, reusing if deck hasn't changed
     if deck and (match_data.deck_cards or match_data.deck_sideboard):
-        logger.debug(f"[{match_id}] Creating deck snapshot")
+        logger.debug(f"[{match_id}] Ensuring deck snapshot")
         _ensure_deck_snapshot(match_data, deck, match, scryfall, import_session)
 
     # Ensure cards exist, passing match/deck/session for unknown card tracking
@@ -349,18 +354,44 @@ def _ensure_deck_snapshot(
     scryfall: ScryfallBulkService,
     import_session: ImportSession,
 ) -> DeckSnapshot:
-    """Create a DeckSnapshot for this match, ensuring all deck cards exist in the DB."""
+    """Create or reuse a DeckSnapshot. A new snapshot is only created when the deck
+    composition changes relative to the most recent snapshot for this deck."""
     all_deck_ids: dict[int, dict] = {}
     for card in match_data.deck_cards + match_data.deck_sideboard:
         cid = card.get("cardId")
         if cid:
             all_deck_ids.setdefault(cid, {})
 
-    # Ensure every card in this snapshot is in the cards table
+    # Ensure every card in this deck list is in the cards table
     if all_deck_ids:
         _ensure_cards(all_deck_ids, {}, scryfall, import_session, match, deck, match_data)
 
-    snapshot = DeckSnapshot.objects.create(deck=deck, match=match)
+    # Build a frozenset representing this deck composition for comparison
+    incoming: set[tuple] = set()
+    for card_data in match_data.deck_cards:
+        cid = card_data.get("cardId")
+        qty = card_data.get("quantity", 1)
+        if cid:
+            incoming.add((cid, qty, False))
+    for card_data in match_data.deck_sideboard:
+        cid = card_data.get("cardId")
+        qty = card_data.get("quantity", 1)
+        if cid:
+            incoming.add((cid, qty, True))
+    incoming_fs = frozenset(incoming)
+
+    # Check if the latest snapshot for this deck matches the incoming list
+    latest = deck.latest_snapshot()
+    if latest is not None:
+        existing_fs = frozenset(latest.cards.values_list("card_id", "quantity", "is_sideboard"))
+        if existing_fs == incoming_fs:
+            logger.debug(f"Reusing snapshot {latest.pk} for deck {deck.name} (no changes)")
+            match.snapshot = latest
+            match.save(update_fields=["snapshot"])
+            return latest
+
+    # Deck changed (or no prior snapshot) — create a new one
+    snapshot = DeckSnapshot.objects.create(deck=deck)
     snapshot_cards = []
 
     for card_data in match_data.deck_cards:
@@ -388,7 +419,11 @@ def _ensure_deck_snapshot(
                 logger.warning(f"Sideboard card {card_id} not found for snapshot")
 
     DeckCard.objects.bulk_create(snapshot_cards, ignore_conflicts=True)
-    logger.debug(f"Snapshot created: {len(snapshot_cards)} cards for deck {deck.name}")
+    logger.debug(
+        f"New snapshot {snapshot.pk} created: {len(snapshot_cards)} cards for deck {deck.name}"
+    )
+    match.snapshot = snapshot
+    match.save(update_fields=["snapshot"])
     return snapshot
 
 

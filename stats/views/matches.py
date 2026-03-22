@@ -21,7 +21,26 @@ def matches_list(request: HttpRequest) -> HttpResponse:
     result_filter = request.GET.get("result")
     format_filter = request.GET.get("format")
 
-    matches = Match.objects.select_related("deck").order_by("-start_time")
+    # Sort parameters
+    _SORT_FIELDS = {
+        "date": "start_time",
+        "result": "result",
+        "opponent": "opponent_name",
+        "deck": "deck__name",
+        "format": "event_id",
+        "turns": "total_turns",
+        "duration": "duration_seconds",
+    }
+    sort_col = request.GET.get("sort", "date")
+    sort_dir = request.GET.get("dir", "desc")
+    if sort_col not in _SORT_FIELDS:
+        sort_col = "date"
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "desc"
+
+    field = _SORT_FIELDS[sort_col]
+    order_prefix = "" if sort_dir == "asc" else "-"
+    matches = Match.objects.select_related("deck").order_by(f"{order_prefix}{field}", "-start_time")
 
     if deck_filter:
         matches = matches.filter(deck__name__icontains=deck_filter)
@@ -53,6 +72,8 @@ def matches_list(request: HttpRequest) -> HttpResponse:
             "current_deck": deck_filter,
             "current_result": result_filter,
             "current_format": format_filter,
+            "current_sort": sort_col,
+            "current_dir": sort_dir,
         },
     )
 
@@ -145,7 +166,7 @@ def match_detail(request: HttpRequest, match_id: int) -> HttpResponse:
     # Get deck cards from this match's specific snapshot
     deck_cards = []
     try:
-        snapshot = match.deck_snapshot
+        snapshot = match.snapshot
         if snapshot:
             deck_cards = snapshot.cards.select_related("card").order_by("card__cmc", "card__name")
     except Exception:

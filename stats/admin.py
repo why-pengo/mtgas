@@ -23,7 +23,7 @@ class DeckCardInline(admin.TabularInline):
 class DeckSnapshotInline(admin.TabularInline):
     model = DeckSnapshot
     extra = 0
-    fields = ("match", "created_at", "total_cards_display", "sideboard_count_display")
+    fields = ("created_at", "total_cards_display", "sideboard_count_display")
     readonly_fields = ("created_at", "total_cards_display", "sideboard_count_display")
     show_change_link = True
 
@@ -55,22 +55,20 @@ class DeckAdmin(admin.ModelAdmin):
 class DeckSnapshotAdmin(admin.ModelAdmin):
     list_display = (
         "deck",
-        "match_short",
+        "match_count_display",
         "total_cards_display",
         "sideboard_count_display",
         "created_at",
     )
     search_fields = ("deck__name", "deck__deck_id")
     list_filter = ("deck__format",)
-    raw_id_fields = ("deck", "match")
+    raw_id_fields = ("deck",)
     inlines = [DeckCardInline]
 
-    def match_short(self, obj):
-        if obj.match_id:
-            return str(obj.match.match_id)[:8] + "..."
-        return "-"
+    def match_count_display(self, obj):
+        return obj.matches.count()
 
-    match_short.short_description = "Match"
+    match_count_display.short_description = "Matches"
 
     def total_cards_display(self, obj):
         return obj.total_cards()

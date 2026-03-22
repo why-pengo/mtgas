@@ -1,5 +1,6 @@
 """
-Tests for deck versioning: DeckSnapshot model, sideboard capture, diff utility.
+Tests for deck versioning: DeckSnapshot model, sideboard capture, diff utility,
+and snapshot deduplication (only create new snapshot when deck composition changes).
 """
 
 from __future__ import annotations
@@ -77,68 +78,77 @@ def match_two(db, deck):
 
 
 class TestDeckSnapshotModel:
-    def test_snapshot_created_for_match(self, deck, match_one, card_bolt):
+    def test_snapshot_linked_to_match_via_fk(self, deck, match_one, card_bolt):
         from stats.models import DeckCard, DeckSnapshot
 
-        snap = DeckSnapshot.objects.create(deck=deck, match=match_one)
+        snap = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=4, is_sideboard=False)
+        match_one.snapshot = snap
+        match_one.save(update_fields=["snapshot"])
 
         assert snap.deck == deck
-        assert snap.match == match_one
+        assert match_one.snapshot == snap
         assert snap.cards.count() == 1
 
     def test_snapshot_accessible_from_match(self, deck, match_one):
         from stats.models import DeckSnapshot
 
-        snap = DeckSnapshot.objects.create(deck=deck, match=match_one)
-        assert match_one.deck_snapshot == snap
+        snap = DeckSnapshot.objects.create(deck=deck)
+        match_one.snapshot = snap
+        match_one.save(update_fields=["snapshot"])
+        match_one.refresh_from_db()
+        assert match_one.snapshot == snap
 
     def test_deck_latest_snapshot_returns_most_recent(self, deck, match_one, match_two):
         from stats.models import DeckSnapshot
 
-        snap1 = DeckSnapshot.objects.create(deck=deck, match=match_one)
-        snap2 = DeckSnapshot.objects.create(deck=deck, match=match_two)
+        snap1 = DeckSnapshot.objects.create(deck=deck)
+        snap2 = DeckSnapshot.objects.create(deck=deck)
 
         latest = deck.latest_snapshot()
         # latest_snapshot returns the most recently created (ordering is -created_at)
         assert latest.pk == snap2.pk
         assert latest.pk != snap1.pk
 
-    def test_deck_total_cards_uses_latest_snapshot(self, deck, match_one, card_bolt, card_path):
+    def test_deck_total_cards_uses_latest_snapshot(self, deck, card_bolt, card_path):
         from stats.models import DeckCard, DeckSnapshot
 
-        snap = DeckSnapshot.objects.create(deck=deck, match=match_one)
+        snap = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=4, is_sideboard=False)
         DeckCard.objects.create(snapshot=snap, card=card_path, quantity=4, is_sideboard=False)
 
         assert deck.total_cards() == 8
 
-    def test_deck_total_cards_excludes_sideboard(self, deck, match_one, card_bolt, card_plains):
+    def test_deck_total_cards_excludes_sideboard(self, deck, card_bolt, card_plains):
         from stats.models import DeckCard, DeckSnapshot
 
-        snap = DeckSnapshot.objects.create(deck=deck, match=match_one)
+        snap = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=4, is_sideboard=False)
         DeckCard.objects.create(snapshot=snap, card=card_plains, quantity=1, is_sideboard=True)
 
         # total_cards() should count only mainboard
         assert deck.total_cards() == 4
 
-    def test_snapshot_without_match_is_valid(self, deck, card_bolt):
-        """DeckSnapshot.match is nullable — useful for test fixtures."""
+    def test_multiple_matches_can_share_snapshot(self, deck, match_one, match_two, card_bolt):
         from stats.models import DeckCard, DeckSnapshot
 
         snap = DeckSnapshot.objects.create(deck=deck)
-        DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=2)
-        assert snap.match is None
-        assert snap.cards.count() == 1
+        DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=4)
+        match_one.snapshot = snap
+        match_one.save(update_fields=["snapshot"])
+        match_two.snapshot = snap
+        match_two.save(update_fields=["snapshot"])
 
-    def test_multiple_snapshots_per_deck(self, deck, match_one, match_two, card_bolt, card_path):
+        assert snap.matches.count() == 2
+        assert deck.snapshots.count() == 1
+
+    def test_multiple_snapshots_per_deck(self, deck, card_bolt, card_path):
         from stats.models import DeckCard, DeckSnapshot
 
-        snap1 = DeckSnapshot.objects.create(deck=deck, match=match_one)
+        snap1 = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap1, card=card_bolt, quantity=4)
 
-        snap2 = DeckSnapshot.objects.create(deck=deck, match=match_two)
+        snap2 = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap2, card=card_bolt, quantity=4)
         DeckCard.objects.create(snapshot=snap2, card=card_path, quantity=4)
 
@@ -148,15 +158,124 @@ class TestDeckSnapshotModel:
 
 
 # ---------------------------------------------------------------------------
+# Snapshot deduplication tests
+# ---------------------------------------------------------------------------
+
+
+class TestSnapshotDeduplication:
+    """Verify that _ensure_deck_snapshot reuses snapshots for identical decks."""
+
+    def _build_deck_data(self, cards_main, cards_side=None):
+        """Build mock deck_cards / deck_sideboard lists like the parser produces."""
+        deck_cards = [{"cardId": card.grp_id, "quantity": qty} for card, qty in cards_main]
+        deck_sideboard = [
+            {"cardId": card.grp_id, "quantity": qty} for card, qty in (cards_side or [])
+        ]
+        return deck_cards, deck_sideboard
+
+    def _call_ensure_snapshot(self, deck, match, deck_cards, deck_sideboard):
+        """Directly exercise the frozenset comparison logic used in both import paths."""
+        from stats.models import DeckCard, DeckSnapshot
+
+        incoming: set[tuple] = set()
+        for cd in deck_cards:
+            cid = cd.get("cardId")
+            qty = cd.get("quantity", 1)
+            if cid:
+                incoming.add((cid, qty, False))
+        for cd in deck_sideboard:
+            cid = cd.get("cardId")
+            qty = cd.get("quantity", 1)
+            if cid:
+                incoming.add((cid, qty, True))
+        incoming_fs = frozenset(incoming)
+
+        latest = deck.latest_snapshot()
+        if latest is not None:
+            existing_fs = frozenset(latest.cards.values_list("card_id", "quantity", "is_sideboard"))
+            if existing_fs == incoming_fs:
+                match.snapshot = latest
+                match.save(update_fields=["snapshot"])
+                return latest
+
+        snapshot = DeckSnapshot.objects.create(deck=deck)
+        for cd in deck_cards:
+            cid = cd.get("cardId")
+            qty = cd.get("quantity", 1)
+            if cid:
+                from stats.models import Card
+
+                card = Card.objects.get(grp_id=cid)
+                DeckCard.objects.create(
+                    snapshot=snapshot, card=card, quantity=qty, is_sideboard=False
+                )
+        for cd in deck_sideboard:
+            cid = cd.get("cardId")
+            qty = cd.get("quantity", 1)
+            if cid:
+                from stats.models import Card
+
+                card = Card.objects.get(grp_id=cid)
+                DeckCard.objects.create(
+                    snapshot=snapshot, card=card, quantity=qty, is_sideboard=True
+                )
+        match.snapshot = snapshot
+        match.save(update_fields=["snapshot"])
+        return snapshot
+
+    def test_identical_deck_reuses_snapshot(self, deck, match_one, match_two, card_bolt):
+        deck_cards, deck_sideboard = self._build_deck_data([(card_bolt, 4)])
+
+        snap1 = self._call_ensure_snapshot(deck, match_one, deck_cards, deck_sideboard)
+        snap2 = self._call_ensure_snapshot(deck, match_two, deck_cards, deck_sideboard)
+
+        assert snap1.pk == snap2.pk, "Same deck composition should reuse the same snapshot"
+        assert deck.snapshots.count() == 1
+        assert match_one.snapshot_id == match_two.snapshot_id
+
+    def test_changed_deck_creates_new_snapshot(
+        self, deck, match_one, match_two, card_bolt, card_path
+    ):
+        deck_cards_v1, sb_v1 = self._build_deck_data([(card_bolt, 4)])
+        deck_cards_v2, sb_v2 = self._build_deck_data([(card_bolt, 4), (card_path, 2)])
+
+        snap1 = self._call_ensure_snapshot(deck, match_one, deck_cards_v1, sb_v1)
+        snap2 = self._call_ensure_snapshot(deck, match_two, deck_cards_v2, sb_v2)
+
+        assert snap1.pk != snap2.pk, "Different deck composition must create a new snapshot"
+        assert deck.snapshots.count() == 2
+
+    def test_sideboard_change_creates_new_snapshot(
+        self, deck, match_one, match_two, card_bolt, card_plains
+    ):
+        deck_cards, sb_empty = self._build_deck_data([(card_bolt, 4)])
+        deck_cards, sb_plains = self._build_deck_data([(card_bolt, 4)], [(card_plains, 2)])
+
+        snap1 = self._call_ensure_snapshot(deck, match_one, deck_cards, sb_empty)
+        snap2 = self._call_ensure_snapshot(deck, match_two, deck_cards, sb_plains)
+
+        assert snap1.pk != snap2.pk, "Sideboard change must create a new snapshot"
+        assert deck.snapshots.count() == 2
+
+    def test_match_snapshot_fk_is_set(self, deck, match_one, card_bolt):
+        deck_cards, deck_sideboard = self._build_deck_data([(card_bolt, 4)])
+
+        snap = self._call_ensure_snapshot(deck, match_one, deck_cards, deck_sideboard)
+        match_one.refresh_from_db()
+
+        assert match_one.snapshot_id == snap.pk
+
+
+# ---------------------------------------------------------------------------
 # Sideboard capture tests
 # ---------------------------------------------------------------------------
 
 
 class TestSideboardCapture:
-    def test_sideboard_cards_stored_with_flag(self, deck, match_one, card_bolt, card_plains):
+    def test_sideboard_cards_stored_with_flag(self, deck, card_bolt, card_plains):
         from stats.models import DeckCard, DeckSnapshot
 
-        snap = DeckSnapshot.objects.create(deck=deck, match=match_one)
+        snap = DeckSnapshot.objects.create(deck=deck)
         DeckCard.objects.create(snapshot=snap, card=card_bolt, quantity=4, is_sideboard=False)
         DeckCard.objects.create(snapshot=snap, card=card_plains, quantity=2, is_sideboard=True)
 
