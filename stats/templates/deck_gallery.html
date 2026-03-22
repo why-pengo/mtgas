@@ -107,11 +107,32 @@
                 {% endif %}
             </div>
             
-            <div class="p-2 text-center bg-black">
+            <div class="card-info">
                 <small><strong>{{ item.card.name }}</strong></small><br>
                 <small class="text-muted">
                     {% if item.card.mana_cost %}{{ item.card.mana_cost }}{% endif %}
                 </small>
+                <div class="card-actions">
+                    {% if item.card.scryfall_id and item.image_url %}
+                    <a href="https://scryfall.com/cards/{{ item.card.scryfall_id }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="card-action-btn"
+                       title="View on Scryfall"
+                       aria-label="View {{ item.card.name }} on Scryfall">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                    {% endif %}
+                    {% if item.card.name %}
+                    <button type="button"
+                            class="card-action-btn card-copy-name"
+                            data-card-name="{{ item.card.name }}"
+                            title="Copy card name"
+                            aria-label="Copy {{ item.card.name }} to clipboard">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endfor %}

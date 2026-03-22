@@ -55,9 +55,30 @@
 
         // Gallery card items
         document.addEventListener("click", function (e) {
+            if (e.target.closest(".card-action-btn")) return;
             const item = e.target.closest(".card-item[data-card-image]");
             if (!item) return;
             openZoom(item.dataset.cardImage, item.dataset.cardFallback || "");
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Copy card name
+    // -------------------------------------------------------------------------
+    function initCopyCardName() {
+        document.addEventListener("click", function (e) {
+            const btn = e.target.closest(".card-copy-name");
+            if (!btn) return;
+            e.stopPropagation();
+            const name = btn.dataset.cardName;
+            if (!name) return;
+            navigator.clipboard.writeText(name).then(function () {
+                const icon = btn.querySelector("i");
+                if (icon) {
+                    icon.classList.replace("bi-clipboard", "bi-clipboard-check");
+                    setTimeout(function () { icon.classList.replace("bi-clipboard-check", "bi-clipboard"); }, 1500);
+                }
+            });
         });
     }
 
@@ -117,6 +138,7 @@
 
         initCardPreviews();
         initCardZoom();
+        initCopyCardName();
     });
 })();
 

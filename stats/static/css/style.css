@@ -869,6 +869,41 @@ html[data-theme="light"] .deck-changed-badge {
     margin-bottom: 20px;
 }
 
+.card-info {
+    padding: 8px;
+    text-align: center;
+    background: black;
+    color: white;
+}
+
+.card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.card-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(255 255 255 / 10%);
+    border: 1px solid rgb(255 255 255 / 20%);
+    color: rgb(255 255 255 / 70%);
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.card-action-btn:hover {
+    background: rgb(255 255 255 / 20%);
+    color: white;
+}
+
 /* Gallery cache progress bar (taller than the global .progress) */
 .cache-status .progress {
     height: 25px;
