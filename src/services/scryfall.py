@@ -374,7 +374,7 @@ class ScryfallBulkService:
             card = scrython.cards.ById(id=scryfall_id)
             image_uris = card.image_uris or {}
             return {
-                "scryfall_id": card.id,
+                "scryfall_id": card.card_id,
                 "name": card.name,
                 "type_line": card.type_line,
                 "image_uri": image_uris.get("normal") if isinstance(image_uris, dict) else None,
