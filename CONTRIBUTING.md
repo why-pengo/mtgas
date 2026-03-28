@@ -120,7 +120,8 @@ pytest tests/test_parser.py -v
 
 ## Project Structure
 
-- `stats/` - Django application (models, views, templates)
+- `stats/` - Main Django application (models, views, templates)
+- `cards/` - Paper Cards Django application (PaperCard model, Scryfall lookup, templatetags)
 - `src/` - Core business logic (parser, services)
 - `tests/` - Test suite
 - `docs/` - Documentation

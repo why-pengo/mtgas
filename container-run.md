@@ -1,9 +1,8 @@
 # Running MTG Arena Stats in Containers
 
 This project ships with a `docker-compose.yml` that starts the full service stack:
-**Django web app, PostgreSQL, Redis, and a Celery worker**. A bind mount keeps your
-local source tree in sync with the containers so code edits take effect immediately
-without rebuilding.
+**Django web app and PostgreSQL**. A bind mount keeps your local source tree in sync
+with the containers so code edits take effect immediately without rebuilding.
 
 ---
 
@@ -12,9 +11,7 @@ without rebuilding.
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
 | `web` | built from `Dockerfile` | `8000` | Django development server |
-| `celery` | built from `Dockerfile` | — | Celery task worker |
 | `postgres` | `postgres:16-alpine` | 5432 (internal) | Primary database |
-| `redis` | `redis:7-alpine` | 6379 (internal) | Celery message broker |
 
 ---
 
@@ -36,9 +33,9 @@ docker compose up --build
 ```
 
 This:
-1. Builds the `web` and `celery` images.
-2. Starts PostgreSQL and Redis (with health checks before dependent services start).
-3. Starts the Django dev server and Celery worker.
+1. Builds the `web` image.
+2. Starts PostgreSQL (with a health check before `web` starts).
+3. Starts the Django dev server.
 
 The app will be available at **http://localhost:8000**.
 
@@ -112,8 +109,7 @@ docker compose up web --no-deps
 
 ## Live code changes
 
-The `web` and `celery` containers mount your project root into `/app` inside the
-container:
+The `web` container mounts your project root into `/app` inside the container:
 
 ```yaml
 volumes:
@@ -122,20 +118,6 @@ volumes:
 
 Because Django's dev server runs with `--reload` by default, **any `.py` file
 edit is picked up automatically** — the server restarts within a second or two.
-
-The Celery worker also watches for code changes with the bind mount, but Celery
-does not auto-reload by default. Restart just the worker after Python changes:
-
-```bash
-docker compose restart celery
-```
-
-Or enable Celery's pool-restart on code change with the `--autoreload` flag
-(add it to the `command:` in `docker-compose.yml`):
-
-```yaml
-command: celery -A mtgas_project worker --loglevel=info --autoreload
-```
 
 ### What is NOT live-reloaded
 
@@ -206,8 +188,7 @@ PostgreSQL. Use this to verify behaviour matches production before shipping.
 | Volume | Mounted at | Contents |
 |--------|-----------|----------|
 | `postgres_data` | inside `postgres` container | PostgreSQL data directory |
-| `redis_data` | inside `redis` container | Redis persistence files |
-| `data_cache` | `/app/data/cache` in `web` + `celery` | Scryfall card image cache |
+| `data_cache` | `/app/data/cache` in `web` | Scryfall card image cache |
 | `media` | `/app/media` in `web` | Django MEDIA_ROOT |
 
 Volumes survive `docker compose down` but are deleted by `docker compose down -v`.
@@ -246,7 +227,6 @@ See `.env.example` for the full list with comments. Key variables:
 | `POSTGRES_PASSWORD` | `mtgas_dev_password` | Database password |
 | `POSTGRES_HOST` | `postgres` | Set by `docker-compose.yml`; only override for external DB |
 | `POSTGRES_PORT` | `5432` | Database port |
-| `CELERY_BROKER_URL` | `redis://redis:6379/0` | Celery broker URL |
 | `TIME_ZONE` | `America/New_York` | Django timezone |
 
 > `POSTGRES_HOST` is always overridden to `postgres` by `docker-compose.yml` so

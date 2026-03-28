@@ -154,6 +154,7 @@ Run `make help` to see all available commands:
 - Add any physical MTG card by name via `/cards/add/`
 - Scryfall's fuzzy API finds the card even with partial or misspelled names
 - Matched cards are saved as `PaperCard` records in the local database
+- The cards table shows mana cost as SVG icons, a Scryfall link, and supports sortable columns and live search
 
 ### Web Interface (Django)
 - **Dashboard**: Win rate, top decks, format stats, recent matches

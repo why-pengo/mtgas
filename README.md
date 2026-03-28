@@ -20,6 +20,11 @@ A Django-based application to track your Magic: The Gathering Arena game statist
   - Life total timeline
 - **Batch Import**: Import log files after gaming sessions using `match_id` to avoid duplicates
 - **Scryfall Integration**: Downloads bulk card data for card name resolution
+- **Paper Cards** (`/cards/`): Catalog your physical MTG collection by name — cards are looked up via Scryfall's fuzzy API and stored locally with:
+  - Mana cost rendered as Scryfall SVG icons
+  - Direct link to each card's Scryfall page
+  - Sortable columns (Name, Mana Cost, Type, Set, Rarity)
+  - Live search / filter
 - **Robust Error Handling**: Graceful handling of incomplete logs and missing data
 
 ## Setup
@@ -139,11 +144,14 @@ pytest --cov=stats --cov=src
 ### Test Categories
 
 - `test_parser.py`: Log file parsing tests
-- `test_scryfall.py`: Scryfall bulk data service tests  
+- `test_scryfall.py`: Scryfall bulk data service tests
 - `test_models.py`: Django model and database tests
 - `test_views.py`: Web interface tests
 - `test_deck_analysis.py`: Mana curve, color pip parsing, deck improvement suggestions
 - `test_deck_versioning.py`: DeckSnapshot deduplication and diff utility
+- `test_cards.py`: Paper Cards model, views, and Scryfall lookup
+- `test_play_advisor.py`: Play advisor / improvement suggestion logic
+- `test_unknown_cards.py`: Unknown card fallback handling
 
 ## Project Structure
 
@@ -152,22 +160,38 @@ mtgas/
 ├── manage.py                    # Django management script
 ├── pyproject.toml               # Project config & dependencies
 ├── Makefile                     # Build automation
+├── container-run.md             # Docker Compose reference
 ├── mtgas_project/               # Django project settings
 │   ├── settings.py
 │   ├── urls.py
 │   └── wsgi.py
 ├── stats/                       # Main Django app
 │   ├── models.py               # Database models
-│   ├── views.py                # Web views
+│   ├── views/                  # Views split by domain
+│   │   ├── dashboard.py
+│   │   ├── decks.py
+│   │   ├── matches.py
+│   │   ├── imports.py
+│   │   └── cards.py
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin configuration
 │   ├── templates/              # HTML templates
 │   ├── static/                 # CSS and JS files
-│   │   └── js/charts.js        # D3.js visualizations
+│   │   ├── css/style.css
+│   │   └── js/
+│   │       ├── app.js
+│   │       └── charts.js       # D3.js visualizations
 │   └── management/commands/    # CLI commands
 │       ├── import_log.py       # Log import command
 │       └── download_cards.py   # Card data download
-├── src/                        # Core logic
+├── cards/                       # Paper Cards Django app
+│   ├── models.py               # PaperCard model
+│   ├── views.py                # Card index, add, detail views
+│   ├── urls.py                 # Mounted at /cards/
+│   ├── templatetags/
+│   │   └── cards_extras.py     # mana_icons, cmc_value filters
+│   └── templates/cards/        # HTML templates
+├── src/                        # Core business logic
 │   ├── exceptions.py           # Custom exceptions
 │   ├── parser/
 │   │   └── log_parser.py       # MTG Arena log parser
@@ -178,7 +202,12 @@ mtgas/
 │   ├── test_parser.py
 │   ├── test_scryfall.py
 │   ├── test_models.py
-│   └── test_views.py
+│   ├── test_views.py
+│   ├── test_cards.py
+│   ├── test_deck_analysis.py
+│   ├── test_deck_versioning.py
+│   ├── test_play_advisor.py
+│   └── test_unknown_cards.py
 └── data/                       # Data directory
     ├── mtga_stats.db           # SQLite database
     ├── cache/                  # Scryfall cache
@@ -218,6 +247,7 @@ mtgas/
 - **life_changes**: Life total tracking
 - **zone_transfers**: Card movements (draw, play, etc.)
 - **import_sessions**: Track import history
+- **paper_cards**: Physical cards catalogued by name via Scryfall lookup
 
 ## Visualizations (D3.js)
 
@@ -274,6 +304,9 @@ Detailed documentation is available in the `docs/` directory:
 - [Database Schema](docs/DATABASE_SCHEMA.md) - Complete schema documentation with ER diagram
 - [Log Parsing](docs/LOG_PARSING.md) - How the MTGA log file is parsed
 - [Development Guide](docs/DEVELOPMENT.md) - Setting up development environment
+- [Logging](docs/LOGGING.md) - Import logging configuration and debugging
+- [Match Replay](docs/MATCH_REPLAY.md) - Match replay technical reference
+- [Docker / Containers](container-run.md) - Running services with Docker Compose
 
 ## Contributing
 

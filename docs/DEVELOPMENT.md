@@ -37,6 +37,7 @@ mtgas/
 ├── manage.py                    # Django entry point
 ├── Makefile                     # Build automation
 ├── pyproject.toml              # Project config & dependencies
+├── container-run.md            # Docker Compose reference
 ├── .flake8                     # Flake8 configuration
 ├── .gitignore                  # Git ignore rules
 │
@@ -50,7 +51,12 @@ mtgas/
 │   ├── __init__.py
 │   ├── apps.py                 # App configuration
 │   ├── models.py               # Database models
-│   ├── views.py                # View functions
+│   ├── views/                  # Views split by domain
+│   │   ├── dashboard.py
+│   │   ├── decks.py
+│   │   ├── matches.py
+│   │   ├── imports.py
+│   │   └── cards.py
 │   ├── urls.py                 # App URL routing
 │   ├── admin.py                # Admin interface
 │   ├── templates/              # HTML templates
@@ -72,6 +78,21 @@ mtgas/
 │           ├── import_log.py
 │           └── download_cards.py
 │
+├── cards/                      # Paper Cards Django application
+│   ├── __init__.py
+│   ├── apps.py
+│   ├── models.py               # PaperCard model
+│   ├── views.py                # Index, add, detail views
+│   ├── urls.py                 # Mounted at /cards/
+│   ├── admin.py
+│   ├── templatetags/
+│   │   └── cards_extras.py     # mana_icons & cmc_value template filters
+│   ├── templates/cards/
+│   │   ├── index.html          # Paper Cards list (sortable, searchable)
+│   │   ├── add_paper_card.html
+│   │   └── paper_card_detail.html
+│   └── migrations/
+│
 ├── src/                        # Core business logic
 │   ├── __init__.py
 │   ├── exceptions.py           # Custom exceptions
@@ -84,11 +105,16 @@ mtgas/
 │
 ├── tests/                      # Test suite
 │   ├── __init__.py
-│   ├── conftest.py             # Pytest configuration
+│   ├── conftest.py             # Pytest configuration & fixtures
 │   ├── test_parser.py          # Parser tests
 │   ├── test_scryfall.py        # Scryfall service tests
 │   ├── test_models.py          # Model tests
-│   └── test_views.py           # View tests
+│   ├── test_views.py           # Stats view tests
+│   ├── test_cards.py           # Paper Cards model & view tests
+│   ├── test_deck_analysis.py   # Mana curve, color distribution tests
+│   ├── test_deck_versioning.py # DeckSnapshot deduplication tests
+│   ├── test_play_advisor.py    # Play advisor tests
+│   └── test_unknown_cards.py  # Unknown card fallback tests
 │
 ├── data/                       # Data directory
 │   ├── .gitkeep
@@ -99,7 +125,9 @@ mtgas/
 └── docs/                       # Documentation
     ├── DATABASE_SCHEMA.md
     ├── LOG_PARSING.md
-    └── DEVELOPMENT.md
+    ├── DEVELOPMENT.md
+    ├── LOGGING.md
+    └── MATCH_REPLAY.md
 ```
 
 ## Development Workflow
@@ -283,7 +311,12 @@ Tests are organized by module:
 - `test_parser.py`: Log parsing functionality
 - `test_scryfall.py`: Scryfall service
 - `test_models.py`: Django models
-- `test_views.py`: Web views
+- `test_views.py`: Stats web views
+- `test_cards.py`: Paper Cards model, views, and Scryfall lookup
+- `test_deck_analysis.py`: Mana curve, color distribution, improvement suggestions
+- `test_deck_versioning.py`: DeckSnapshot deduplication and diff
+- `test_play_advisor.py`: Play advisor / improvement suggestion logic
+- `test_unknown_cards.py`: Unknown card fallback handling
 
 Example test:
 ```python
