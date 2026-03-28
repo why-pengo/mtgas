@@ -10,7 +10,6 @@ Environment variables (all optional — sensible defaults for local development)
   POSTGRES_PASSWORD   — PostgreSQL password
   POSTGRES_HOST       — PostgreSQL host (default: "localhost")
   POSTGRES_PORT       — PostgreSQL port (default: "5432")
-  CELERY_BROKER_URL   — Celery broker URL (default: "redis://localhost:6379/0")
   TIME_ZONE           — Django timezone (default: "America/New_York")
 """
 
@@ -42,7 +41,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "stats",  # Our main app
-    "django_celery_results",
     "cards",
 ]
 
@@ -125,15 +123,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # MTG Arena specific settings
 MTGA_LOG_PATH = None  # Set via environment or command line
 SCRYFALL_CACHE_DIR = BASE_DIR / "data" / "cache"
-
-# --- Celery ---
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 5 * 60
 
 # --- Media files (local filesystem) ---
 MEDIA_URL = "/media/"

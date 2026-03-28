@@ -20,27 +20,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # ─── Celery worker ────────────────────────────────────────────────────────
-  celery:
-    build: .
-    command: celery -A mtgas_project worker --loglevel=info
-    volumes:
-      - .:/app                  # bind mount: live code changes reflected immediately
-      - /app/.venv
-      - /app/node_modules
-      - data_cache:/app/data/cache
-    env_file:
-      - .env
-    environment:
-      POSTGRES_HOST: postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   # ─── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
@@ -57,19 +36,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # ─── Redis (Celery broker) ─────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
 volumes:
   postgres_data:   # PostgreSQL data directory
-  redis_data:      # Redis persistence (AOF/RDB)
   data_cache:      # Scryfall card image cache (data/cache/)
   media:           # Django MEDIA_ROOT

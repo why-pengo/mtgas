@@ -2,7 +2,7 @@ from django.db import models
 
 
 class PaperCard(models.Model):
-    """A physical MTG card identified via photo OCR and Scryfall API lookup."""
+    """A physical MTG card identified via Scryfall API lookup."""
 
     scryfall_id = models.CharField(max_length=50, unique=True)
     name        = models.CharField(max_length=255)
@@ -45,39 +45,4 @@ class PaperCard(models.Model):
             },
         )
         return paper_card
-
-
-class CardImage(models.Model):
-    """An uploaded photo of a physical MTG card, with OCR matching result."""
-
-    class Status(models.TextChoices):
-        PENDING    = "pending",    "Pending"
-        PROCESSING = "processing", "Processing"
-        MATCHED    = "matched",    "Matched"
-        UNMATCHED  = "unmatched",  "Unmatched"
-        FAILED     = "failed",     "Failed"
-
-    image      = models.ImageField(upload_to="cards/%Y/%m/")
-    status     = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.PENDING
-    )
-    ocr_text   = models.CharField(
-        max_length=512,
-        blank=True,
-        help_text="Card name text extracted from the image via OCR",
-    )
-    paper_card = models.ForeignKey(
-        PaperCard,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="card_images",
-    )
-    error      = models.TextField(blank=True)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
-
-    def __str__(self) -> str:
-        name = self.paper_card.name if self.paper_card else "unmatched"
-        return f"CardImage {self.pk} [{self.status}] {name}"
 

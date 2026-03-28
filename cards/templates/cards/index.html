@@ -5,14 +5,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">Paper Cards</h1>
-    <div class="d-flex gap-2">
-        <a href="{% url 'cards:photography_guide' %}" target="_blank" rel="noopener"
-           class="btn btn-outline-secondary">
-            📷 Photography Guide
-        </a>
-        <a href="{% url 'cards:add_paper_card' %}" class="btn btn-outline-primary">Add by Name</a>
-        <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload Photo</a>
-    </div>
+    <a href="{% url 'cards:add_paper_card' %}" class="btn btn-primary">Add by Name</a>
 </div>
 
 {% if paper_cards %}
@@ -46,56 +39,10 @@
         </table>
     </div>
 </div>
-{% endif %}
-
-{% if recent_uploads %}
-<div class="card">
-    <div class="card-header"><strong>Recent Photo Uploads</strong></div>
-    <div class="card-body p-0">
-        <table class="table table-striped table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Uploaded</th>
-                    <th>Status</th>
-                    <th>Matched Card</th>
-                    <th>OCR Read</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in recent_uploads %}
-                <tr>
-                    <td>
-                        <a href="{% url 'cards:card_detail' pk=item.pk %}">#{{ item.pk }}</a>
-                    </td>
-                    <td>{{ item.uploaded_at|date:"Y-m-d H:i" }}</td>
-                    <td>
-                        <span class="badge
-                            {% if item.status == 'matched' %}bg-success
-                            {% elif item.status == 'unmatched' %}bg-warning text-dark
-                            {% elif item.status == 'failed' %}bg-danger
-                            {% else %}bg-secondary
-                            {% endif %}">
-                            {{ item.get_status_display }}
-                        </span>
-                    </td>
-                    <td>{{ item.paper_card.name|default:"—" }}</td>
-                    <td class="text-muted">{{ item.ocr_text|default:"—" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
-
-{% if not paper_cards and not recent_uploads %}
+{% else %}
 <div class="text-center py-5 text-muted">
     <p class="fs-5">No paper cards yet.</p>
-    <div class="d-flex justify-content-center gap-3">
-        <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload a Photo</a>
-        <a href="{% url 'cards:add_paper_card' %}" class="btn btn-outline-primary">Add by Name</a>
-    </div>
+    <a href="{% url 'cards:add_paper_card' %}" class="btn btn-primary">Add by Name</a>
 </div>
 {% endif %}
 {% endblock %}

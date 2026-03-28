@@ -2,7 +2,7 @@
 
 ## Option A: Docker Compose (Recommended)
 
-Docker Compose starts all services (Django, Celery, PostgreSQL, Redis) with a single command. No local Python, Redis, or Tesseract install required.
+Docker Compose starts all services (Django, PostgreSQL) with a single command. No local Python install required.
 
 ### Prerequisites
 
@@ -24,7 +24,7 @@ The defaults work out of the box for local development.
 docker compose up --build
 ```
 
-This builds the image (first run only, subsequent runs are fast), then starts `web`, `celery`, `postgres`, and `redis`.
+This builds the image (first run only, subsequent runs are fast), then starts `web` and `postgres`.
 
 ### 3. Run migrations and download card data
 
@@ -51,15 +51,6 @@ Browse to **http://127.0.0.1:8000/**
 
 ## Option B: Running Locally on macOS
 
-### Prerequisites
-
-```bash
-brew install redis tesseract
-```
-
-- **Redis** — message broker for Celery
-- **Tesseract** — OCR engine for paper card photo matching (`/cards/`)
-
 ### Setup
 
 ```bash
@@ -84,18 +75,6 @@ make run
 
 # 7. Open browser to http://127.0.0.1:8000/
 ```
-
-### Full local stack (3 terminals)
-
-The card image recognition feature (`/cards/`) requires Redis and a Celery worker running alongside Django.
-
-| Terminal | Command |
-|----------|---------|
-| 1 – Redis | `redis-server` |
-| 2 – Django | `make run` |
-| 3 – Celery | `.venv/bin/celery -A mtgas_project worker --loglevel=info` |
-
-> **Note:** Card image matching (`/cards/upload/`) will silently queue but never process if the Celery worker is not running.
 
 ## Running Tests
 
@@ -172,12 +151,9 @@ Run `make help` to see all available commands:
 - No per-card API calls needed
 
 ### Paper Card Identification (`/cards/`)
-- Upload a photo of any physical MTG card
-- **OCR + Scryfall**: Tesseract reads the card name; Scryfall's fuzzy API identifies it
-- Manual override: type the card name if OCR gets it wrong
-- Add by name: look up any card without a photo via `/cards/add/`
+- Add any physical MTG card by name via `/cards/add/`
+- Scryfall's fuzzy API finds the card even with partial or misspelled names
 - Matched cards are saved as `PaperCard` records in the local database
-- Requires Redis + Celery worker (see startup instructions above)
 
 ### Web Interface (Django)
 - **Dashboard**: Win rate, top decks, format stats, recent matches
