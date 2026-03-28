@@ -1,12 +1,41 @@
-import imagehash
-from io import BytesIO
-from PIL import Image
+import re
+
+import pytesseract
+import requests
 from celery import shared_task
+from PIL import Image
 
-from .models import CardImage
-from stats.models import Card
+from .models import CardImage, PaperCard
 
-MATCH_THRESHOLD = 12  # Hamming distance; lower = stricter. 10-15 is a good starting range.
+SCRYFALL_NAMED_URL = "https://api.scryfall.com/cards/named"
+
+
+def _extract_card_name(img: Image.Image) -> str:
+    """
+    Run OCR on the full image and return the most likely card name candidate.
+
+    MTG card names sit near the top of the card as the largest/first text line.
+    We take the first non-empty line that looks like a name (letters, reasonable
+    length) as the best candidate.
+    """
+    text = pytesseract.image_to_string(img)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    candidates = [
+        line for line in lines
+        if 2 <= len(line) <= 60 and re.search(r"[A-Za-z]", line)
+    ]
+    return candidates[0] if candidates else text.strip()[:60]
+
+
+def _lookup_scryfall(name: str) -> dict | None:
+    """Call Scryfall fuzzy name search. Returns the card data dict or None."""
+    try:
+        resp = requests.get(SCRYFALL_NAMED_URL, params={"fuzzy": name}, timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+    except requests.RequestException:
+        pass
+    return None
 
 
 @shared_task(bind=True, max_retries=3)
@@ -20,40 +49,25 @@ def match_card_image(self, card_image_id: int):
     card.save(update_fields=["status", "updated_at"])
 
     try:
-        # 1. Compute phash of the uploaded image
         img = Image.open(card.image.path).convert("RGB")
-        upload_hash = imagehash.phash(img)
+        ocr_name = _extract_card_name(img)
+        card.ocr_text = ocr_name
 
-        # 2. Compare against all cards in the Card model that have a phash
-        best_match = None
-        best_distance = None
-
-        for scryfall_card in Card.objects.exclude(phash__isnull=True).iterator():
-            db_hash = imagehash.hex_to_hash(scryfall_card.phash)
-            distance = upload_hash - db_hash
-            if best_distance is None or distance < best_distance:
-                best_distance = distance
-                best_match = scryfall_card
-            if distance == 0:
-                break  # perfect match, stop early
-
-        if best_match and best_distance <= MATCH_THRESHOLD:
-            card.scryfall_card = best_match
-            card.match_distance = best_distance
+        scryfall_data = _lookup_scryfall(ocr_name)
+        if scryfall_data:
+            paper_card = PaperCard.upsert_from_scryfall(scryfall_data)
+            card.paper_card = paper_card
             card.status = CardImage.Status.MATCHED
+            card.error = ""
         else:
             card.status = CardImage.Status.UNMATCHED
-            card.error = (
-                f"No match within threshold {MATCH_THRESHOLD}. "
-                f"Best distance was {best_distance}."
-            )
+            card.error = f'No Scryfall match for OCR text: "{ocr_name}"'
 
-        card.save(
-            update_fields=["scryfall_card", "match_distance", "status", "error", "updated_at"]
-        )
+        card.save(update_fields=["paper_card", "ocr_text", "status", "error", "updated_at"])
 
     except Exception as exc:
         card.status = CardImage.Status.FAILED
         card.error = str(exc)
         card.save(update_fields=["status", "error", "updated_at"])
         raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+

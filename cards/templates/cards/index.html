@@ -8,38 +8,49 @@
     <div class="d-flex gap-2">
         <a href="{% url 'cards:photography_guide' %}" target="_blank" rel="noopener"
            class="btn btn-outline-secondary">
-            📷 Card Photography Guide
+            📷 Photography Guide
         </a>
-        <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload Paper Card</a>
+        <a href="{% url 'cards:add_paper_card' %}" class="btn btn-outline-primary">Add by Name</a>
+        <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload Photo</a>
     </div>
 </div>
 
-{% if phash_total %}
-<div class="card mb-4 phash-status-card">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-1">
-            <h6 class="card-subtitle phash-status-title">Phash Index</h6>
-            <span class="phash-status-counts">
-                {{ phash_indexed }} / {{ phash_total }} cards indexed
-                {% if phash_missing %}<span class="phash-status-missing">({{ phash_missing }} missing)</span>{% endif %}
-            </span>
-        </div>
-        <div class="progress phash-progress" role="progressbar"
-             aria-valuenow="{{ phash_pct }}" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar {% if phash_pct == 100 %}bg-success{% elif phash_pct >= 50 %}bg-info{% else %}bg-warning{% endif %}"
-                 style="width: {{ phash_pct }}%">{{ phash_pct }}%</div>
-        </div>
-        {% if phash_missing %}
-        <p class="phash-status-hint mb-0">
-            Run <code>python manage.py build_phash_index</code> to index the remaining {{ phash_missing }} card{{ phash_missing|pluralize }}.
-        </p>
-        {% endif %}
+{% if paper_cards %}
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Your Paper Cards</strong>
+        <span class="text-muted ms-2">({{ paper_cards|length }} card{{ paper_cards|length|pluralize }})</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-striped table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Set</th>
+                    <th>Rarity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pc in paper_cards %}
+                <tr>
+                    <td>
+                        <a href="{% url 'cards:paper_card_detail' pk=pc.pk %}">{{ pc.name }}</a>
+                    </td>
+                    <td>{{ pc.type_line|default:"—" }}</td>
+                    <td>{{ pc.set_code|upper|default:"—" }}</td>
+                    <td>{{ pc.rarity|default:"—"|capfirst }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}
 
-{% if recent %}
+{% if recent_uploads %}
 <div class="card">
+    <div class="card-header"><strong>Recent Photo Uploads</strong></div>
     <div class="card-body p-0">
         <table class="table table-striped table-hover mb-0">
             <thead>
@@ -47,12 +58,12 @@
                     <th>#</th>
                     <th>Uploaded</th>
                     <th>Status</th>
-                    <th>Matched Paper Card</th>
-                    <th>Distance</th>
+                    <th>Matched Card</th>
+                    <th>OCR Read</th>
                 </tr>
             </thead>
             <tbody>
-                {% for item in recent %}
+                {% for item in recent_uploads %}
                 <tr>
                     <td>
                         <a href="{% url 'cards:card_detail' pk=item.pk %}">#{{ item.pk }}</a>
@@ -68,18 +79,24 @@
                             {{ item.get_status_display }}
                         </span>
                     </td>
-                    <td>{{ item.scryfall_card.name|default:"—" }}</td>
-                    <td>{{ item.match_distance|default:"—" }}</td>
+                    <td>{{ item.paper_card.name|default:"—" }}</td>
+                    <td class="text-muted">{{ item.ocr_text|default:"—" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-{% else %}
+{% endif %}
+
+{% if not paper_cards and not recent_uploads %}
 <div class="text-center py-5 text-muted">
-    <p class="fs-5">No paper cards uploaded yet.</p>
-    <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload your first paper card</a>
+    <p class="fs-5">No paper cards yet.</p>
+    <div class="d-flex justify-content-center gap-3">
+        <a href="{% url 'cards:upload' %}" class="btn btn-primary">Upload a Photo</a>
+        <a href="{% url 'cards:add_paper_card' %}" class="btn btn-outline-primary">Add by Name</a>
+    </div>
 </div>
 {% endif %}
 {% endblock %}
+

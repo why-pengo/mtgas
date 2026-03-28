@@ -33,28 +33,27 @@
                 <img src="{{ card.image.url }}"
                      class="img-fluid rounded card-upload-img"
                      alt="Uploaded paper card">
+                {% if card.ocr_text %}
+                <p class="text-muted mt-2 mb-0">
+                    <small><strong>OCR read:</strong> {{ card.ocr_text }}</small>
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    {% if card.scryfall_card %}
+    {% if card.paper_card %}
     <div class="col-md-8">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title">
-                    Matched: {{ card.scryfall_card.name }}
-                    <span class="badge bg-success ms-2">
-                        Distance: {{ card.match_distance }}
-                        {% if card.match_distance == 0 %}(perfect){% endif %}
-                    </span>
-                </h5>
+                <h5 class="card-title">Matched: {{ card.paper_card.name }}</h5>
 
                 <div class="row g-3 mt-1">
-                    {% if card.scryfall_card.image_uri %}
+                    {% if card.paper_card.image_uri %}
                     <div class="col-auto">
-                        <img src="{{ card.scryfall_card.image_uri }}"
+                        <img src="{{ card.paper_card.image_uri }}"
                              class="img-fluid rounded card-scryfall-img"
-                             alt="{{ card.scryfall_card.name }}">
+                             alt="{{ card.paper_card.name }}">
                     </div>
                     {% endif %}
                     <div class="col">
@@ -62,19 +61,23 @@
                             <tbody>
                                 <tr>
                                     <th>Mana cost</th>
-                                    <td>{{ card.scryfall_card.mana_cost|default:"—" }}</td>
+                                    <td>{{ card.paper_card.mana_cost|default:"—" }}</td>
                                 </tr>
                                 <tr>
                                     <th>Type</th>
-                                    <td>{{ card.scryfall_card.type_line|default:"—" }}</td>
+                                    <td>{{ card.paper_card.type_line|default:"—" }}</td>
                                 </tr>
                                 <tr>
                                     <th>Set</th>
-                                    <td>{{ card.scryfall_card.set_code|default:"—" }}</td>
+                                    <td>{{ card.paper_card.set_code|upper|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Rarity</th>
+                                    <td>{{ card.paper_card.rarity|default:"—"|capfirst }}</td>
                                 </tr>
                                 <tr>
                                     <th>Oracle text</th>
-                                    <td>{{ card.scryfall_card.oracle_text|default:"—" }}</td>
+                                    <td>{{ card.paper_card.oracle_text|default:"—" }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -84,24 +87,35 @@
         </div>
     </div>
 
-    {% elif card.status == "unmatched" %}
+    {% elif card.status == "unmatched" or card.status == "failed" %}
     <div class="col-md-8">
-        <div class="alert alert-warning h-100 mb-0">
-            <strong>No match found.</strong><br>{{ card.error }}
-        </div>
-    </div>
-
-    {% elif card.status == "failed" %}
-    <div class="col-md-8">
-        <div class="alert alert-danger h-100 mb-0">
-            <strong>Processing failed.</strong><br>{{ card.error }}
+        <div class="alert alert-warning mb-0">
+            <strong>
+                {% if card.status == "failed" %}Processing failed.{% else %}No match found.{% endif %}
+            </strong><br>{{ card.error }}
         </div>
     </div>
     {% endif %}
 </div>
 
+{% if card.status != "pending" and card.status != "processing" %}
+<div class="card mt-4">
+    <div class="card-body">
+        <h6 class="card-title mb-3">Wrong match? Enter the card name manually:</h6>
+        <form method="post" action="{% url 'cards:name_lookup' pk=card.pk %}" class="d-flex gap-2">
+            {% csrf_token %}
+            <input type="text" name="card_name" class="form-control"
+                   placeholder="e.g. Wickerbough Elder"
+                   value="{{ card.ocr_text }}" required>
+            <button type="submit" class="btn btn-outline-primary text-nowrap">Re-match</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <div class="mt-4">
-    <a href="{% url 'cards:upload' %}" class="btn btn-outline-secondary me-2">Upload Another Paper Card</a>
+    <a href="{% url 'cards:upload' %}" class="btn btn-outline-secondary me-2">Upload Another Card</a>
     <a href="{% url 'cards:index' %}" class="btn btn-outline-secondary">All Paper Cards</a>
 </div>
 {% endblock %}
+

@@ -35,7 +35,7 @@ dependencies = [
     "celery>=5.3",
     "django-celery-results>=2.5",
     "redis>=4.0",
-    "imagehash>=4.3",
+    "pytesseract>=0.3",
     "scrython>=2.0",
 ]
 

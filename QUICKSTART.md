@@ -1,10 +1,70 @@
 # MTG Arena Statistics Tracker - Quick Start
 
-## Setup Commands
+## Option A: Docker Compose (Recommended)
+
+Docker Compose starts all services (Django, Celery, PostgreSQL, Redis) with a single command. No local Python, Redis, or Tesseract install required.
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS / Windows) or Docker Engine + Docker Compose plugin (Linux)
+
+### 1. Configure environment
+
+Copy the example env file and adjust as needed:
+
+```bash
+cp .env.example .env
+```
+
+The defaults work out of the box for local development.
+
+### 2. Start all services
+
+```bash
+docker compose up --build
+```
+
+This builds the image (first run only, subsequent runs are fast), then starts `web`, `celery`, `postgres`, and `redis`.
+
+### 3. Run migrations and download card data
+
+In a separate terminal:
+
+```bash
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py download_cards
+```
+
+### 4. Import your game log
+
+```bash
+docker compose exec web python manage.py import_log /app/data/Player.log
+# or copy the log file first:
+# cp ~/Library/Logs/Wizards\ Of\ The\ Coast/MTGA/Player.log data/Player.log
+```
+
+### 5. Open the app
+
+Browse to **http://127.0.0.1:8000/**
+
+---
+
+## Option B: Running Locally on macOS
+
+### Prerequisites
+
+```bash
+brew install redis tesseract
+```
+
+- **Redis** — message broker for Celery
+- **Tesseract** — OCR engine for paper card photo matching (`/cards/`)
+
+### Setup
 
 ```bash
 # 1. Navigate to project directory
-cd /Users/jmorgan/workspace/mtgas
+cd /path/to/mtgas
 
 # 2. Create and activate virtual environment
 make venv
@@ -25,19 +85,17 @@ make run
 # 7. Open browser to http://127.0.0.1:8000/
 ```
 
-## Alternative: Manual Setup
+### Full local stack (3 terminals)
 
-If you prefer not to use the Makefile:
+The card image recognition feature (`/cards/`) requires Redis and a Celery worker running alongside Django.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python manage.py migrate
-python manage.py download_cards
-python manage.py import_log data/Player.log
-python manage.py runserver
-```
+| Terminal | Command |
+|----------|---------|
+| 1 – Redis | `redis-server` |
+| 2 – Django | `make run` |
+| 3 – Celery | `.venv/bin/celery -A mtgas_project worker --loglevel=info` |
+
+> **Note:** Card image matching (`/cards/upload/`) will silently queue but never process if the Celery worker is not running.
 
 ## Running Tests
 
@@ -112,6 +170,14 @@ Run `make help` to see all available commands:
 - Downloads bulk JSON (~350MB) once with `make download-cards`
 - Builds local index for fast Arena ID → card name lookups
 - No per-card API calls needed
+
+### Paper Card Identification (`/cards/`)
+- Upload a photo of any physical MTG card
+- **OCR + Scryfall**: Tesseract reads the card name; Scryfall's fuzzy API identifies it
+- Manual override: type the card name if OCR gets it wrong
+- Add by name: look up any card without a photo via `/cards/add/`
+- Matched cards are saved as `PaperCard` records in the local database
+- Requires Redis + Celery worker (see startup instructions above)
 
 ### Web Interface (Django)
 - **Dashboard**: Win rate, top decks, format stats, recent matches

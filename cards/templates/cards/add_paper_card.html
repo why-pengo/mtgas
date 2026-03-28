@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Paper Cards — Add by Name{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h1 class="mb-4">Add a Paper Card</h1>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Search by Card Name</h5>
+
+                {% if error %}
+                <div class="alert alert-warning">{{ error }}</div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="card-name-input" class="form-label">Card name</label>
+                        <input id="card-name-input" type="text" name="card_name"
+                               class="form-control" placeholder="e.g. Wickerbough Elder"
+                               autofocus required>
+                        <div class="form-text">Partial names and typos are okay — Scryfall will fuzzy-match.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Find &amp; Add</button>
+                </form>
+
+                <p class="text-muted mt-3 mb-0">
+                    <small>
+                        Alternatively, <a href="{% url 'cards:upload' %}">upload a photo</a>
+                        and let OCR detect the name automatically.
+                    </small>
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{% url 'cards:index' %}" class="btn btn-outline-secondary">← Back to Paper Cards</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

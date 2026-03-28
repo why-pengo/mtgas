@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Paper Cards — {{ paper_card.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <h1 class="mb-0">{{ paper_card.name }}</h1>
+    {% if paper_card.rarity %}
+    <span class="badge
+        {% if paper_card.rarity == 'mythic' %}bg-danger
+        {% elif paper_card.rarity == 'rare' %}bg-warning text-dark
+        {% elif paper_card.rarity == 'uncommon' %}bg-secondary
+        {% else %}bg-light text-dark border
+        {% endif %}">
+        {{ paper_card.rarity|capfirst }}
+    </span>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    {% if paper_card.image_uri %}
+    <div class="col-auto">
+        <img src="{{ paper_card.image_uri }}"
+             class="img-fluid rounded card-scryfall-img"
+             alt="{{ paper_card.name }}">
+    </div>
+    {% endif %}
+
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <th>Mana cost</th>
+                            <td>{{ paper_card.mana_cost|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Type</th>
+                            <td>{{ paper_card.type_line|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Set</th>
+                            <td>{{ paper_card.set_code|upper|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Rarity</th>
+                            <td>{{ paper_card.rarity|default:"—"|capfirst }}</td>
+                        </tr>
+                        {% if paper_card.oracle_text %}
+                        <tr>
+                            <th>Oracle text</th>
+                            <td>{{ paper_card.oracle_text }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <th>Scryfall ID</th>
+                            <td>
+                                <a href="https://scryfall.com/card/{{ paper_card.scryfall_id }}"
+                                   target="_blank" rel="noopener">
+                                    {{ paper_card.scryfall_id }}
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Last fetched</th>
+                            <td>{{ paper_card.fetched_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{% url 'cards:index' %}" class="btn btn-outline-secondary">← Back to Paper Cards</a>
+    <a href="{% url 'cards:add_paper_card' %}" class="btn btn-outline-primary ms-2">Add Another</a>
+</div>
+{% endblock %}
