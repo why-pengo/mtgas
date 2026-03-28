@@ -4,7 +4,7 @@ This document describes the database schema used by the MTG Arena Statistics Tra
 
 ## Overview
 
-The database uses SQLite (via Django ORM) and consists of 9 main tables that track matches, decks, cards, and game events.
+The database uses SQLite (via Django ORM) and consists of 13 tables that track matches, decks, cards, game events, and physical card inventory.
 
 ## Entity Relationship Diagram
 
@@ -265,7 +265,78 @@ Tracks log file import history.
 | `status` | VARCHAR(20) | pending, running, completed, failed |
 | `error_message` | TEXT | Error details if failed |
 
-## Key Relationships
+### 10. card_tokens
+
+Stores token card metadata fetched from Scryfall (e.g. "1/1 Red Warrior Token"). Tokens are looked up on demand and cached here.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `scryfall_id` | VARCHAR(50) (PK) | Scryfall UUID for the token |
+| `name` | VARCHAR(255) | Token name |
+| `type_line` | VARCHAR(255) | Type line (e.g. `"Token Creature — Warrior"`) |
+| `image_uri` | VARCHAR(500) | URL to token card image |
+| `colors` | JSON | Array of colors |
+| `power` | VARCHAR(10) | Power (nullable) |
+| `toughness` | VARCHAR(10) | Toughness (nullable) |
+| `updated_at` | DATETIME | Last update timestamp |
+
+### 11. card_token_refs
+
+Through-table linking a `cards` row to the tokens it can create.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK) | Auto-increment ID |
+| `card_id` | INTEGER (FK) | Reference to cards.grp_id (CASCADE delete) |
+| `token_id` | VARCHAR(50) (FK) | Reference to card_tokens.scryfall_id (CASCADE delete) |
+
+**Constraints:**
+- Unique together on (`card_id`, `token_id`)
+
+### 12. unknown_cards
+
+Tracks Arena card IDs that could not be resolved during import, for later manual review or re-resolution.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK) | Auto-increment ID |
+| `grp_id` | INTEGER (FK) | Reference to cards.grp_id (CASCADE delete) |
+| `match_id` | INTEGER (FK) | Match where the card appeared (SET NULL on delete, nullable) |
+| `deck_id` | INTEGER (FK) | Deck where the card appeared (SET NULL on delete, nullable) |
+| `import_session_id` | INTEGER (FK) | Import session that discovered this card (CASCADE delete) |
+| `raw_data` | JSON | Raw card data from log (for debugging) |
+| `is_resolved` | BOOLEAN | Whether the card has been manually resolved |
+| `resolved_at` | DATETIME | When it was resolved (nullable) |
+| `created_at` | DATETIME | Discovery timestamp |
+
+**Indexes:**
+- Index on `is_resolved`
+- Index on (`grp_id`, `is_resolved`)
+
+### 13. paper_cards
+
+Physical MTG cards catalogued by name via the Scryfall named-card API. Populated through the `/cards/` web interface.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK) | Auto-increment ID |
+| `scryfall_id` | VARCHAR(50) | Scryfall UUID (unique) |
+| `name` | VARCHAR(255) | Card name |
+| `type_line` | VARCHAR(255) | Type line |
+| `oracle_text` | TEXT | Rules text |
+| `mana_cost` | VARCHAR(100) | Mana cost string (e.g. `"{3}{G}"`) |
+| `colors` | JSON | Array of colors |
+| `set_code` | VARCHAR(10) | Set code (e.g. `"ecc"`) |
+| `rarity` | VARCHAR(20) | `common`, `uncommon`, `rare`, `mythic` |
+| `image_uri` | VARCHAR(500) | URL to card image |
+| `fetched_at` | DATETIME | Last Scryfall fetch timestamp |
+
+**Constraints:**
+- Unique index on `scryfall_id`
+
+> This table is independent of the Arena-side `cards` table — it stores any physical card by name, regardless of whether it appears in Arena game logs.
+
+
 
 1. **Deck → DeckSnapshots**: One-to-many (one deck identity, many versioned snapshots)
 2. **Match → DeckSnapshot**: Many-to-one FK (`Match.snapshot`). Multiple matches share the same snapshot when the deck hasn't changed. A new snapshot is created only when the card composition differs from the previous one.
@@ -276,6 +347,9 @@ Tracks log file import history.
 7. **Match → Life Changes**: One-to-many (cascade delete)
 8. **Match → Zone Transfers**: One-to-many (cascade delete)
 9. **Actions/Transfers → Cards**: Many-to-one (for card details)
+10. **Card ↔ CardToken**: Many-to-many via `card_token_refs` (a card can create multiple tokens; a token can be created by multiple cards)
+11. **UnknownCard → Card / Match / Deck / ImportSession**: Many-to-one FKs for context
+12. **PaperCard**: Standalone — no FK relationships to Arena tables
 
 ## Common Queries
 
