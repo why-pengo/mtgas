@@ -272,13 +272,28 @@ def _import_match(
     # Resolve deck identity — snapshot is created after Match
     deck = None
     if match_data.deck_id:
-        deck, _ = Deck.objects.get_or_create(
+        deck, created = Deck.objects.get_or_create(
             deck_id=match_data.deck_id,
             defaults={
                 "name": match_data.deck_name or "Unknown Deck",
                 "format": match_data.format,
             },
         )
+        if not created:
+            # Sync name and format if they've been updated in Arena
+            update_fields = []
+            new_name = match_data.deck_name or "Unknown Deck"
+            if deck.name != new_name:
+                deck.name = new_name
+                update_fields.append("name")
+            if match_data.format and deck.format != match_data.format:
+                deck.format = match_data.format
+                update_fields.append("format")
+            if update_fields:
+                deck.save(update_fields=update_fields + ["updated_at"])
+                logger.info(
+                    f"[{match_id}] Updated deck {deck.deck_id}: {', '.join(update_fields)} changed"
+                )
         logger.debug(f"[{match_id}] Deck ready: {deck.name}")
 
     # Collect all unique card IDs (includes instance data for better unknowns)

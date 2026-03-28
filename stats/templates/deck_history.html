@@ -78,6 +78,33 @@
                 </div>
                 {% endif %}
             </div>
+            {% if entry.analysis.suggestions %}
+            <details class="mt-3">
+                <summary class="text-muted small">
+                    Analysis for this version
+                    <span class="badge bg-secondary ms-1">{{ entry.analysis.suggestions|length }} suggestion{{ entry.analysis.suggestions|length|pluralize }}</span>
+                    <span class="text-muted ms-2">avg CMC {{ entry.analysis.avg_cmc }} &middot; {{ entry.analysis.curve_shape }}</span>
+                </summary>
+                <div class="deck-suggestions mt-2">
+                    {% for s in entry.analysis.suggestions %}
+                    <div class="deck-suggestion deck-suggestion--{{ s.severity }}">
+                        <div class="deck-suggestion__header">
+                            <span class="deck-suggestion__badge">{{ s.category }}</span>
+                            <strong class="deck-suggestion__title">{{ s.title }}</strong>
+                        </div>
+                        <p class="deck-suggestion__body">{{ s.body }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
+            <p class="text-muted small mt-2 mb-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-check-circle-fill text-success me-1" viewBox="0 0 16 16">
+                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                </svg>
+                No issues found for this version &mdash; avg CMC {{ entry.analysis.avg_cmc }} &middot; {{ entry.analysis.curve_shape }}
+            </p>
+            {% endif %}
         </div>
         {% elif not entry.is_first %}
         <div class="card-body py-2 text-muted small">No changes from previous version.</div>
@@ -116,6 +143,33 @@
                     {% endif %}
                 </div>
             </details>
+            {% if entry.analysis.suggestions %}
+            <details class="mt-3">
+                <summary class="text-muted small">
+                    Analysis for this version
+                    <span class="badge bg-secondary ms-1">{{ entry.analysis.suggestions|length }} suggestion{{ entry.analysis.suggestions|length|pluralize }}</span>
+                    <span class="text-muted ms-2">avg CMC {{ entry.analysis.avg_cmc }} &middot; {{ entry.analysis.curve_shape }}</span>
+                </summary>
+                <div class="deck-suggestions mt-2">
+                    {% for s in entry.analysis.suggestions %}
+                    <div class="deck-suggestion deck-suggestion--{{ s.severity }}">
+                        <div class="deck-suggestion__header">
+                            <span class="deck-suggestion__badge">{{ s.category }}</span>
+                            <strong class="deck-suggestion__title">{{ s.title }}</strong>
+                        </div>
+                        <p class="deck-suggestion__body">{{ s.body }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% else %}
+            <p class="text-muted small mt-2 mb-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-check-circle-fill text-success me-1" viewBox="0 0 16 16">
+                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                </svg>
+                No issues found for this version &mdash; avg CMC {{ entry.analysis.avg_cmc }} &middot; {{ entry.analysis.curve_shape }}
+            </p>
+            {% endif %}
         </div>
         {% endif %}
     </div>

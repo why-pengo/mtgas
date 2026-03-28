@@ -406,6 +406,35 @@ def _categorize_cards(deck_cards):
     return cards_by_type, mana_curve, color_counts
 
 
+def _analyze_snapshot(snapshot: DeckSnapshot | None) -> dict[str, Any]:
+    """Compute deck analysis metrics for a given snapshot.
+
+    Returns the same dict as _compute_deck_suggestions, or an empty-suggestions
+    dict when snapshot is None (no card data yet).
+    """
+    if snapshot is None:
+        return {
+            "avg_cmc": 0.0,
+            "curve_shape": "Unknown",
+            "pip_counts": {},
+            "pip_pct": {},
+            "pip_summary": "",
+            "one_ofs": 0,
+            "two_ofs": 0,
+            "three_ofs": 0,
+            "four_ofs": 0,
+            "suggestions": [],
+        }
+    deck_cards = list(snapshot.cards.select_related("card").order_by("card__cmc", "card__name"))
+    cards_by_type, mana_curve, color_counts = _categorize_cards(deck_cards)
+    total_cards = sum(dc.quantity for dc in deck_cards)
+    total_lands = sum(dc.quantity for dc in deck_cards if "Land" in (dc.card.type_line or ""))
+    suggested_lands = round(total_cards * 17 / 40)
+    return _compute_deck_suggestions(
+        deck_cards, mana_curve, color_counts, total_cards, total_lands, suggested_lands
+    )
+
+
 def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     """Detailed deck view — shows latest snapshot card list."""
     deck = get_object_or_404(Deck, pk=deck_id)
@@ -445,9 +474,7 @@ def deck_detail(request: HttpRequest, deck_id: int) -> HttpResponse:
     land_pct = round(total_lands / total_cards * 100, 1) if total_cards > 0 else 0
     suggested_lands = round(total_cards * 17 / 40)
 
-    deck_analysis = _compute_deck_suggestions(
-        deck_cards, mana_curve, color_counts, total_cards, total_lands, suggested_lands
-    )
+    deck_analysis = _analyze_snapshot(latest)
 
     return render(
         request,
@@ -491,6 +518,7 @@ def deck_history(request: HttpRequest, deck_id: int) -> HttpResponse:
                 "first_match": first_match,
                 "match_count": match_count,
                 "is_first": i == 0,
+                "analysis": _analyze_snapshot(snap),
             }
         )
 

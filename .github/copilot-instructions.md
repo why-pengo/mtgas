@@ -49,7 +49,8 @@ make ci          # Run check + test (use before commits)
 1. **`src/`** - Core business logic (parser, services)
    - `parser/log_parser.py` - Parses MTGA Player.log JSON events
    - `services/scryfall.py` - Downloads/caches Scryfall bulk data
-   - `services/import_service.py` - Orchestrates import workflow
+   - `services/import_service.py` - Orchestrates import workflow (used by management command and `stats/views/imports.py`)
+   - `services/play_advisor.py` - Per-match strategic play analysis (per-turn suggestions)
    - `exceptions.py` - Custom exception types
 
 2. **`stats/`** - Django app (models, views, templates)
@@ -59,14 +60,12 @@ make ci          # Run check + test (use before commits)
    - `templates/` - Django templates
    - `static/` - CSS (`css/style.css`) and JS (`js/app.js`, `js/charts.js`)
 
-3. **`cards/`** - Django app for card image recognition
-   - `models.py` - `CardImage` model (upload, status, FK to `stats.Card`, phash match distance)
-   - `views.py` - Index, upload, detail, and photography guide views
-   - `forms.py` - `CardImageUploadForm` with 10 MB size validation
-   - `tasks.py` - Celery task `match_card_image`: computes phash, finds best match via Hamming distance (threshold: 12)
-   - `urls.py` - Mounted at `/cards/` (app_name = `cards`)
-   - `management/commands/build_phash_index.py` - CLI to batch-compute phashes for all `stats.Card` records
-   - `templates/cards/` - `index.html`, `upload.html`, `card_detail.html`
+3. **`cards/`** - Django app for physical (paper) card inventory
+   - `models.py` - `PaperCard` model: stores card metadata fetched from Scryfall named-card API
+   - `views.py` - `card_index`, `add_paper_card` (fuzzy name lookup → Scryfall), `paper_card_detail`
+   - `templatetags/cards_extras.py` - `mana_icons` and `cmc_value` template filters
+   - `urls.py` - Mounted at `/cards/` (app_name = `cards`); routes: `/`, `/add/`, `/paper/<pk>/`
+   - `templates/cards/` - `index.html` (sortable/searchable table), `add_paper_card.html`, `paper_card_detail.html`
 
 4. **`mtgas_project/`** - Django project configuration
    - `settings.py` - Django settings (INSTALLED_APPS, DATABASE, etc.)
@@ -211,14 +210,17 @@ LifeChange, ZoneTransfer
 
 ### `webapp-testing`
 - Dev server: `make run` → `http://127.0.0.1:8000`
-- Key routes: `/` (dashboard), `/import/`, `/card-data/`, `/cards/`, `/matches/`, `/decks/`
+- Key routes: `/` (dashboard), `/import/`, `/card-data/`, `/cards/` (paper card inventory), `/matches/`, `/decks/`
 
 ## Development Workflow
 
 1. **Branch**: Use feature branches (not main)
 2. **Format**: Run `make format` before committing
 3. **Test**: Run `make ci` to check format, lint, and tests
-4. **Docs**: After all changes, review and update any markdown docs (`README.md`, `CONTRIBUTING.md`, `QUICKSTART.md`, `docs/`) that are affected by or describe the changed behavior
+4. **Docs**: After all changes, review and update **every** markdown doc that is affected:
+   - `README.md`, `CONTRIBUTING.md`, `QUICKSTART.md` — top-level user-facing docs
+   - `docs/` — technical reference docs (`DATABASE_SCHEMA.md`, `DEVELOPMENT.md`, `LOG_PARSING.md`, `LOGGING.md`, `MATCH_REPLAY.md`)
+   - **Rule**: If your commit adds, removes, or changes a feature, model, route, command, or configuration value described in any of these files, update that file in the same commit. Do not leave docs stale.
 5. **Commit**: Use conventional commit prefixes:
    - `feat:` - New features
    - `fix:` - Bug fixes
@@ -228,17 +230,21 @@ LifeChange, ZoneTransfer
 
 ## Important Notes
 
-- **Card image recognition** (`cards/` app): Upload a card photo to `/cards/upload/`; a Celery task (`match_card_image`) computes a perceptual hash (phash) and finds the closest `stats.Card` by Hamming distance (threshold: 12)
-  - Requires Celery worker running alongside Django
-  - Before matching works, populate phashes: `python manage.py build_phash_index` (downloads images from Scryfall URLs stored in `stats.Card.image_uri`)
-  - `CardImage.status` lifecycle: `pending` → `processing` → `matched` | `unmatched` | `failed`
-  - Photography guide available at `/cards/photography-guide/`
+- **Paper Cards inventory** (`cards/` app): Catalogue physical MTG cards at `/cards/`
+  - Add a card by name at `/cards/add/` — uses Scryfall fuzzy named-card API to fetch metadata
+  - Card list (`/cards/`) is sortable by column and searchable; rows show mana icons via `mana_icons` template filter
+  - `PaperCard` is independent of the Arena `cards` table — tracks any physical card by name
+  - No Celery, no image upload, no phash — fully synchronous Scryfall lookups
 - **Import logging**: Comprehensive logging added to import process for debugging
   - Logger name: `stats.views`
-  - INFO level: Match-level progress, import summaries
+  - INFO level: Match-level progress, import summaries (including deck name/format updates)
   - DEBUG level: Detailed per-operation logging (deck creation, card lookups, bulk creates)
   - ERROR level: Full exception tracebacks with context data
   - Fixed bug: LifeChange model uses `change_amount` field (was incorrectly `change`)
+- **Deck versioning and analysis history**: Deck name/format are kept in sync on every import
+  - `_import_match` updates `Deck.name` and `Deck.format` whenever Arena reports a change (not just on creation)
+  - `_analyze_snapshot(snapshot)` in `stats/views/decks.py` computes analysis for any `DeckSnapshot`; used in both `deck_detail` and `deck_history` views
+  - The deck history page (`/deck/<id>/history/`) shows a collapsible analysis section for every version, so users can track how suggestions changed as the deck evolved
 - **Card image caching**: Deck gallery view downloads and caches Scryfall card images locally
   - Images stored in `data/cache/card_images/`
   - One-click batch download for all cards in a deck
