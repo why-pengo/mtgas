@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load cards_extras %}
 
 {% block title %}Paper Cards{% endblock %}
 
@@ -10,18 +11,22 @@
 
 {% if paper_cards %}
 <div class="card mb-4">
-    <div class="card-header">
+    <div class="card-header d-flex align-items-center gap-3 flex-wrap">
         <strong>Your Paper Cards</strong>
-        <span class="text-muted ms-2">({{ paper_cards|length }} card{{ paper_cards|length|pluralize }})</span>
+        <span class="text-muted" id="paper-cards-count">({{ paper_cards|length }} card{{ paper_cards|length|pluralize }})</span>
+        <input type="search" id="paper-cards-search" class="form-control form-control-sm paper-cards-search ms-auto"
+               placeholder="Search cards…" autocomplete="off">
     </div>
     <div class="card-body p-0">
-        <table class="table table-striped table-hover mb-0">
+        <table class="table table-striped table-hover mb-0" id="paper-cards-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Set</th>
-                    <th>Rarity</th>
+                    <th data-sortable data-sort-type="text">Name <span class="sort-indicator">⇅</span></th>
+                    <th data-sortable data-sort-type="text">Mana Cost <span class="sort-indicator">⇅</span></th>
+                    <th data-sortable data-sort-type="text">Type <span class="sort-indicator">⇅</span></th>
+                    <th data-sortable data-sort-type="text">Set <span class="sort-indicator">⇅</span></th>
+                    <th data-sortable data-sort-type="text">Rarity <span class="sort-indicator">⇅</span></th>
+                    <th class="text-center">Link</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,13 +35,28 @@
                     <td>
                         <a href="{% url 'cards:paper_card_detail' pk=pc.pk %}">{{ pc.name }}</a>
                     </td>
+                    <td data-sort-value="{{ pc.mana_cost|cmc_value }}">
+                        {% if pc.mana_cost %}
+                            {{ pc.mana_cost|mana_icons }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td>{{ pc.type_line|default:"—" }}</td>
                     <td>{{ pc.set_code|upper|default:"—" }}</td>
                     <td>{{ pc.rarity|default:"—"|capfirst }}</td>
+                    <td class="text-center">
+                        {% if pc.scryfall_id %}
+                        <a href="https://scryfall.com/search?q=id:{{ pc.scryfall_id }}"
+                           target="_blank" rel="noopener noreferrer"
+                           class="scryfall-link" title="View on Scryfall">⬡</a>
+                        {% else %}—{% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        <p class="paper-cards-no-results text-center text-muted py-3" style="display:none">No cards match your search.</p>
     </div>
 </div>
 {% else %}
@@ -45,5 +65,88 @@
     <a href="{% url 'cards:add_paper_card' %}" class="btn btn-primary">Add by Name</a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.getElementById('paper-cards-table');
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    const searchInput = document.getElementById('paper-cards-search');
+    const countEl = document.getElementById('paper-cards-count');
+    const noResults = document.querySelector('.paper-cards-no-results');
+    const totalCards = {{ paper_cards|length }};
+
+    /* ── Sorting ─────────────────────────────────────────────────── */
+    let activeHeader = null;
+    let ascending = true;
+
+    table.querySelectorAll('th[data-sortable]').forEach(function (th, colIndex) {
+        th.addEventListener('click', function () {
+            if (activeHeader === th) {
+                ascending = !ascending;
+            } else {
+                if (activeHeader) {
+                    activeHeader.removeAttribute('data-sort-dir');
+                    activeHeader.querySelector('.sort-indicator').textContent = '⇅';
+                }
+                ascending = true;
+                activeHeader = th;
+            }
+
+            th.setAttribute('data-sort-dir', ascending ? 'asc' : 'desc');
+            th.querySelector('.sort-indicator').textContent = ascending ? '▲' : '▼';
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const sortType = th.dataset.sortType || 'text';
+
+            rows.sort(function (a, b) {
+                const cellA = a.cells[colIndex];
+                const cellB = b.cells[colIndex];
+                const rawA = (cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent).trim();
+                const rawB = (cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent).trim();
+
+                let valA, valB;
+                if (sortType === 'number') {
+                    valA = parseFloat(rawA) || 0;
+                    valB = parseFloat(rawB) || 0;
+                } else {
+                    valA = rawA.toLowerCase();
+                    valB = rawB.toLowerCase();
+                }
+
+                if (valA < valB) return ascending ? -1 : 1;
+                if (valA > valB) return ascending ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(function (row) { tbody.appendChild(row); });
+        });
+    });
+
+    /* ── Search / filter ─────────────────────────────────────────── */
+    function updateCount() {
+        const visible = Array.from(tbody.querySelectorAll('tr')).filter(
+            r => r.style.display !== 'none'
+        ).length;
+        const word = visible === 1 ? 'card' : 'cards';
+        countEl.textContent = visible === totalCards
+            ? `(${totalCards} ${word})`
+            : `(${visible} of ${totalCards} ${word})`;
+        noResults.style.display = visible === 0 ? '' : 'none';
+    }
+
+    searchInput.addEventListener('input', function () {
+        const query = this.value.trim().toLowerCase();
+        Array.from(tbody.querySelectorAll('tr')).forEach(function (row) {
+            const text = row.textContent.toLowerCase();
+            row.style.display = (!query || text.includes(query)) ? '' : 'none';
+        });
+        updateCount();
+    });
+});
+</script>
 {% endblock %}
 

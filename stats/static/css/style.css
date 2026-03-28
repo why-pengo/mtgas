@@ -362,6 +362,34 @@ body {
 }
 
 /* =============================================================================
+   Mana Symbol Images (Paper Cards table)
+   ============================================================================= */
+.mana-symbol {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    margin: 0 1px;
+}
+
+/* =============================================================================
+   Paper Cards — search input & Scryfall link
+   ============================================================================= */
+.paper-cards-search {
+    max-width: 220px;
+}
+
+.scryfall-link {
+    font-size: 1.1rem;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+
+.scryfall-link:hover {
+    opacity: 1;
+}
+
+/* =============================================================================
    Progress Bars
    ============================================================================= */
 .progress {
