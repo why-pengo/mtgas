@@ -3,7 +3,6 @@ services:
   # ─── Django web application ────────────────────────────────────────────────
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app                  # bind mount: live code changes reflected immediately
       - /app/.venv              # shadow local .venv so container Python is used
@@ -17,6 +16,8 @@ services:
     environment:
       # Always point to the Docker Postgres service, regardless of .env
       POSTGRES_HOST: postgres
+      # Enable debug mode for local development (overrides the Dockerfile default of False)
+      DJANGO_DEBUG: "True"
     depends_on:
       postgres:
         condition: service_healthy
