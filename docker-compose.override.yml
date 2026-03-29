@@ -5,4 +5,4 @@
 services:
   web:
     command: >
-      sh -c "pip install --quiet -e '.[dev]' && python manage.py runserver 0.0.0.0:8000"
+      sh -c "pip install --quiet --no-cache-dir -e '.[dev]' && python manage.py runserver 0.0.0.0:8000"
