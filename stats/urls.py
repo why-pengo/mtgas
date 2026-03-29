@@ -23,5 +23,7 @@ urlpatterns = [
     path("card-data/", views.card_data, name="card_data"),
     path("unknown-cards/", views.unknown_cards_list, name="unknown_cards_list"),
     path("unknown-card/<int:grp_id>/fix/", views.unknown_card_fix, name="unknown_card_fix"),
+    path("backup/", views.backup_restore, name="backup"),
+    path("backup/download/", views.backup_download, name="backup_download"),
     path("api/stats/", views.api_stats, name="api_stats"),
 ]

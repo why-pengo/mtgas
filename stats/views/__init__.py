@@ -5,6 +5,7 @@ Re-exports all URL-facing views so that urls.py can continue to use
 ``from . import views`` and then ``views.dashboard`` etc. unchanged.
 """
 
+from .backup import backup_download, backup_restore
 from .cards import unknown_card_fix, unknown_cards_list
 from .dashboard import api_stats, dashboard
 from .decks import deck_detail, deck_gallery, deck_history, decks_list
@@ -27,4 +28,6 @@ __all__ = [
     "card_data",
     "unknown_cards_list",
     "unknown_card_fix",
+    "backup_download",
+    "backup_restore",
 ]
