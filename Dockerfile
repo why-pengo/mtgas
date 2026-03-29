@@ -24,6 +24,9 @@ RUN useradd --no-create-home --shell /bin/false django && \
     chown -R django:django /app
 USER django
 
+# Safe production default — overridden by docker-compose (via .env) for local dev
+ENV DJANGO_DEBUG=False
+
 EXPOSE 8000
 
 # Use Gunicorn for production. The docker-compose dev setup overrides this
