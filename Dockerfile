@@ -20,8 +20,8 @@ RUN mkdir -p stats src mtgas_project cards && \
 COPY . .
 
 # Run as a non-root user for security
-RUN useradd --no-create-home --shell /bin/false django && \
-    chown -R django:django /app
+RUN useradd --create-home --shell /bin/false django && \
+    chown -R django:django /app /home/django
 USER django
 
 # Safe production default — overridden by docker-compose (via .env) for local dev
