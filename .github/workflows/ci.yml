@@ -53,26 +53,5 @@ jobs:
       - name: Run tests
         run: make test
 
-  codeql:
-    name: CodeQL security scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-          queries: security-and-quality
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:python"
+# CodeQL is handled automatically by GitHub's default setup (Security > Code scanning).
+# An advanced workflow configuration cannot coexist with default setup — no job needed here.
