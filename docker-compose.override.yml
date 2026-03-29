@@ -1,0 +1,8 @@
+# docker-compose.override.yml — automatically merged by docker-compose for local dev.
+# Installs dev dependencies (pytest, black, flake8, isort, etc.) on top of the
+# production image so you can run tests and linting inside the container if needed.
+# This file is NOT used in production deployments.
+services:
+  web:
+    command: >
+      sh -c "pip install --quiet -e '.[dev]' && python manage.py runserver 0.0.0.0:8000"

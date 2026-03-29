@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md ./
 RUN mkdir -p stats src mtgas_project cards && \
     touch stats/__init__.py src/__init__.py mtgas_project/__init__.py cards/__init__.py && \
-    pip install --no-cache-dir -e ".[dev,postgres,production]"
+    pip install --no-cache-dir -e ".[postgres,production]"
 
 # Copy application code (overridden by the bind mount in docker-compose.yml)
 COPY . .

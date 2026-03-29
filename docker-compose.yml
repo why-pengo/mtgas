@@ -3,7 +3,6 @@ services:
   # ─── Django web application ────────────────────────────────────────────────
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app                  # bind mount: live code changes reflected immediately
       - /app/.venv              # shadow local .venv so container Python is used
