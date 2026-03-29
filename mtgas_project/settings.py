@@ -2,15 +2,15 @@
 Django settings for mtgas_project.
 
 Environment variables (all optional — sensible defaults for local development):
-  DJANGO_SECRET_KEY   — secret key (insecure default used when not set)
-  DJANGO_DEBUG        — "True" / "False" (default: "True")
+  DJANGO_SECRET_KEY    — secret key (insecure default used when not set; MUST be set in production)
+  DJANGO_DEBUG         — "True" / "False" (default: "True" for local dev; set "False" in production)
   DJANGO_ALLOWED_HOSTS — comma-separated extra hosts (e.g. "example.com,api.example.com")
-  POSTGRES_DB         — PostgreSQL database name; when set, enables PostgreSQL instead of SQLite
-  POSTGRES_USER       — PostgreSQL user (default: "mtgas")
-  POSTGRES_PASSWORD   — PostgreSQL password
-  POSTGRES_HOST       — PostgreSQL host (default: "localhost")
-  POSTGRES_PORT       — PostgreSQL port (default: "5432")
-  TIME_ZONE           — Django timezone (default: "America/New_York")
+  POSTGRES_DB          — PostgreSQL database name; when set, enables PostgreSQL instead of SQLite
+  POSTGRES_USER        — PostgreSQL user (default: "mtgas")
+  POSTGRES_PASSWORD    — PostgreSQL password
+  POSTGRES_HOST        — PostgreSQL host (default: "localhost")
+  POSTGRES_PORT        — PostgreSQL port (default: "5432")
+  TIME_ZONE            — Django timezone (default: "America/New_York")
 """
 
 import os
@@ -119,6 +119,22 @@ STATICFILES_DIRS = [
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Security settings ---
+# Always set (safe defaults even in development).
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Production-only hardening — activated automatically when DEBUG=False.
+# When running behind HTTPS (e.g. with a reverse proxy), also set:
+#   SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # MTG Arena specific settings
 MTGA_LOG_PATH = None  # Set via environment or command line

@@ -49,6 +49,9 @@ dev = [
 postgres = [
     "psycopg2-binary>=2.9",
 ]
+production = [
+    "gunicorn>=21.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/why-pengo/mtgas"
