@@ -214,14 +214,15 @@ LifeChange, ZoneTransfer
 
 ## Development Workflow
 
-1. **Branch**: Use feature branches (not main)
-2. **Format**: Run `make format` before committing
-3. **Test**: Run `make ci` to check format, lint, and tests
-4. **Docs**: After all changes, review and update **every** markdown doc that is affected:
+1. **Branch**: Every piece of work must happen on a feature branch (never commit directly to `main`). The branch must be linked to a GitHub issue — create one first if none exists. Name branches after the issue: `issue-{number}-{short-description}` (e.g., `issue-23-semantic-versioning`).
+2. **GitHub Issue**: All work must be tracked by a GitHub issue. Before starting any task, confirm an issue exists (or create one). Reference the issue number in the branch name and in commit messages / PR descriptions.
+3. **Format**: Run `make format` before committing
+4. **Test**: Run `make ci` to check format, lint, and tests
+5. **Docs**: After all changes, review and update **every** markdown doc that is affected:
    - `README.md`, `CONTRIBUTING.md`, `QUICKSTART.md` — top-level user-facing docs
    - `docs/` — technical reference docs (`DATABASE_SCHEMA.md`, `DEVELOPMENT.md`, `LOG_PARSING.md`, `LOGGING.md`, `MATCH_REPLAY.md`)
    - **Rule**: If your commit adds, removes, or changes a feature, model, route, command, or configuration value described in any of these files, update that file in the same commit. Do not leave docs stale.
-5. **Commit**: Use conventional commit prefixes:
+6. **Commit**: Use conventional commit prefixes:
    - `feat:` - New features
    - `fix:` - Bug fixes
    - `refactor:` - Code refactoring
