@@ -270,6 +270,39 @@ LifeChange, ZoneTransfer
 - **CSS linting**: Requires `npm install` for stylelint; Python linting works without Node.js
 - **Migration conflicts**: Always pull latest before `makemigrations`
 
+## GitHub Issue Writing Guidelines
+
+When creating GitHub issues, follow these rules to ensure they are clear and actionable.
+
+### Bug Reports
+- **Title**: Short and specific — e.g., *"Import fails when log has duplicate match IDs"*
+- **Steps to reproduce**: Numbered, minimal steps to trigger the bug
+- **Expected vs. actual behavior**: What should happen vs. what does happen
+- **Environment**: OS, Python version, relevant config
+- **Error output**: Full tracebacks in fenced code blocks
+
+### Feature Requests
+- **Title**: Action-oriented — e.g., *"Add deck win-rate chart to dashboard"*
+- **Problem statement**: What pain point does this solve?
+- **Proposed solution**: What should the feature do?
+- **Alternatives considered**: Other approaches that were ruled out
+- **Acceptance criteria**: Bullet list of "done when..." conditions
+
+### General Rules
+- **One issue = one concern** — do not bundle multiple problems into one issue
+- **Use labels** — `bug`, `enhancement`, `documentation`, `good first issue`
+- **Link related issues/PRs** — use `#123` references where relevant
+- **Add screenshots or logs** — attach files for visual or output evidence
+- **Write acceptance criteria** — makes it unambiguous when the issue is resolved
+
+### Acceptance Criteria Template
+```
+### Acceptance Criteria
+- [ ] <observable outcome 1>
+- [ ] <observable outcome 2>
+- [ ] Tests cover the new behavior
+```
+
 ## Troubleshooting
 
 - **Import fails silently**: Check `match_id` isn't already in database
