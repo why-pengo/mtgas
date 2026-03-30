@@ -389,6 +389,87 @@ body {
     opacity: 1;
 }
 
+/* Copy-name button on card detail page */
+.copy-name-btn {
+    font-size: 0.85rem;
+    padding: 0.15rem 0.45rem;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.copy-name-btn--copied {
+    color: #4caf50;
+    border-color: #4caf50;
+}
+
+/* Disambiguation candidate grid */
+.card-candidates-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.25rem;
+}
+
+.card-candidate-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 110px;
+    padding: 0.4rem;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+}
+
+.card-candidate-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.card-candidate-img {
+    width: 100%;
+    border-radius: 4px;
+}
+
+.card-candidate-no-img {
+    width: 100%;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    text-align: center;
+    color: var(--text-muted, #aaa);
+    background: var(--bg-header);
+    border-radius: 4px;
+    padding: 0.25rem;
+}
+
+.card-candidate-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 0.3rem;
+    width: 100%;
+}
+
+.card-candidate-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+    color: var(--text-primary, inherit);
+    word-break: break-word;
+}
+
+.card-candidate-set {
+    font-size: 0.65rem;
+    color: var(--text-muted, #aaa);
+    margin-top: 0.1rem;
+}
+
 /* =============================================================================
    Progress Bars
    ============================================================================= */

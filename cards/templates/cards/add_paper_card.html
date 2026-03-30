@@ -1,11 +1,43 @@
 {% extends "base.html" %}
+{% load cards_extras %}
 
 {% block title %}Paper Cards — Add by Name{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <h1 class="mb-4">Add a Paper Card</h1>
+
+        {% if candidates %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Multiple matches found</strong> — pick the card you want to add:
+            </div>
+            <div class="card-body p-2">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-candidates-grid">
+                        {% for c in candidates %}
+                        <button type="submit" name="scryfall_id" value="{{ c.id }}"
+                                class="card-candidate-btn" title="{{ c.name }} ({{ c.set|upper }})">
+                            {% if c.image_uris %}
+                            <img src="{{ c.image_uris.small }}" alt="{{ c.name }}" loading="lazy" class="card-candidate-img">
+                            {% elif c.card_faces and c.card_faces.0.image_uris %}
+                            <img src="{{ c.card_faces.0.image_uris.small }}" alt="{{ c.name }}" loading="lazy" class="card-candidate-img">
+                            {% else %}
+                            <div class="card-candidate-no-img">{{ c.name }}</div>
+                            {% endif %}
+                            <div class="card-candidate-label">
+                                <span class="card-candidate-name">{{ c.name }}</span>
+                                <span class="card-candidate-set">{{ c.set|upper }}</span>
+                            </div>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="card">
             <div class="card-body">
