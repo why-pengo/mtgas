@@ -3,7 +3,11 @@
 # This Makefile provides commands for common development tasks.
 # Run `make help` to see all available commands.
 
-.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log
+.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log docker-build docker-up docker-down
+
+# Git metadata for Docker image tagging
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')
+GIT_SHA    := $(shell git rev-parse --short HEAD 2>/dev/null)
 
 # Default Python interpreter
 VENV := .venv
@@ -170,6 +174,24 @@ test-models: check-venv ## Run only model tests
 
 test-views: check-venv ## Run only view tests
 	$(VENV_BIN)/pytest tests/test_views.py -v
+
+# =============================================================================
+# Docker
+# =============================================================================
+
+docker-build: ## Build the dev container image tagged with branch and commit SHA
+	@echo "$(BLUE)Building Docker image: mtgas:$(GIT_BRANCH)-$(GIT_SHA)$(NC)"
+	GIT_BRANCH=$(GIT_BRANCH) GIT_SHA=$(GIT_SHA) docker compose build
+	@echo "$(GREEN)Image built: mtgas:$(GIT_BRANCH)-$(GIT_SHA)$(NC)"
+
+docker-up: ## Start all services (builds image if needed)
+	@echo "$(BLUE)Starting services (mtgas:$(GIT_BRANCH)-$(GIT_SHA))...$(NC)"
+	GIT_BRANCH=$(GIT_BRANCH) GIT_SHA=$(GIT_SHA) docker compose up
+
+docker-down: ## Stop and remove containers
+	@echo "$(BLUE)Stopping services...$(NC)"
+	docker compose down
+	@echo "$(GREEN)Services stopped$(NC)"
 
 # =============================================================================
 # Cleanup

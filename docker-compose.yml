@@ -3,6 +3,7 @@ services:
   # ─── Django web application ────────────────────────────────────────────────
   web:
     build: .
+    image: mtgas:${GIT_BRANCH:-local}-${GIT_SHA:-dev}
     volumes:
       - .:/app                  # bind mount: live code changes reflected immediately
       - /app/.venv              # shadow local .venv so container Python is used

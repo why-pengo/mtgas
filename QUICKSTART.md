@@ -21,10 +21,18 @@ The defaults work out of the box for local development.
 ### 2. Start all services
 
 ```bash
-docker compose up --build
+make docker-up
 ```
 
-This builds the image (first run only, subsequent runs are fast), then starts `web` and `postgres`.
+This exports the current git branch and short commit SHA, then starts `web` and `postgres`. The built image is tagged `mtgas:<branch>-<sha>` (e.g. `mtgas:main-a1b2c3d`).
+
+To build the image without starting services:
+
+```bash
+make docker-build
+```
+
+> **Bare `docker compose` commands** still work but will tag the image as `mtgas:local-dev` unless you export `GIT_BRANCH` and `GIT_SHA` yourself.
 
 ### 3. Run migrations and download card data
 
