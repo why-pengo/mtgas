@@ -132,8 +132,12 @@
         const btn  = document.getElementById(btnId);
         if (!form || !btn) return;
         form.addEventListener("submit", function () {
+            const spinner = document.createElement("span");
+            spinner.className = "btn-spinner";
+            spinner.setAttribute("aria-hidden", "true");
+
             btn.disabled = true;
-            btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>' + label;
+            btn.replaceChildren(spinner, document.createTextNode(" " + label));
         });
     }
 
