@@ -3,7 +3,7 @@
 # This Makefile provides commands for common development tasks.
 # Run `make help` to see all available commands.
 
-.PHONY: help install install-dev setup migrate run test lint format check clean download-cards import-log check-venv
+.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log
 
 # Default Python interpreter
 VENV := .venv
@@ -36,17 +36,6 @@ check-venv: ## Verify .venv exists; fail fast with a helpful message if not
 # =============================================================================
 # Environment Setup
 # =============================================================================
-
-venv: ## Create virtual environment
-	@echo "$(BLUE)Creating virtual environment...$(NC)"
-	$(PYTHON) -m venv $(VENV)
-	@echo "$(GREEN)Virtual environment created at $(VENV)$(NC)"
-	@echo "Activate with: source $(VENV)/bin/activate"
-
-install: ## Install production dependencies
-	@echo "$(BLUE)Installing production dependencies...$(NC)"
-	$(PIP) install -e .
-	@echo "$(GREEN)Dependencies installed$(NC)"
 
 install-dev: ## Install development dependencies (includes formatting/linting tools)
 	@echo "$(BLUE)Installing development dependencies...$(NC)"
@@ -170,7 +159,7 @@ test-verbose: check-venv ## Run tests with verbose output
 
 test-cov: check-venv ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage...$(NC)"
-	$(VENV_BIN)/pytest --cov=stats --cov=src --cov-report=html --cov-report=term
+	$(VENV_BIN)/pytest --cov=stats --cov=src --cov=cards --cov-report=html --cov-report=term
 	@echo "$(GREEN)Coverage report generated in htmlcov/$(NC)"
 
 test-parser: check-venv ## Run only parser tests
@@ -207,17 +196,6 @@ clean-all: clean ## Remove all generated files including database and cache
 # =============================================================================
 # Documentation
 # =============================================================================
-
-docs: ## Generate documentation (placeholder)
-	@echo "$(BLUE)Documentation is in README.md and docs/$(NC)"
-
-# =============================================================================
-# Combined Commands
-# =============================================================================
-
-all: setup download-cards ## Full setup including card data download
-	@echo "$(GREEN)Full setup complete!$(NC)"
-	@echo "Run 'make run' to start the development server"
 
 ci: check test ## Run all CI checks (format, lint, test)
 	@echo "$(GREEN)All CI checks passed$(NC)"

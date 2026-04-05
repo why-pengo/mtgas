@@ -57,9 +57,8 @@ Browse to **http://127.0.0.1:8000/**
 # 1. Navigate to project directory
 cd /path/to/mtgas
 
-# 2. Create and activate virtual environment
-make venv
-source .venv/bin/activate
+# 2. Create virtual environment
+python3 -m venv .venv
 
 # 3. Full setup (install deps + migrate database)
 make setup
@@ -89,7 +88,7 @@ make test-verbose
 make test-cov
 
 # Run specific test file
-pytest tests/test_parser.py
+make test-parser
 ```
 
 ## Code Quality
@@ -121,8 +120,7 @@ Run `make help` to see all available commands:
 | `make format` | Format code with black/isort |
 | `make lint` | Run flake8 linter |
 | `make lint-css` | Run stylelint on CSS |
-| `make check` | Run Python code quality checks |
-| `make check-all` | Run all checks including CSS |
+| `make check` | Run all checks: format, lint, and CSS (requires `npm install`) |
 | `make ci` | Run checks + tests (for CI) |
 | `make download-cards` | Download Scryfall data |
 | `make import-log LOG=path` | Import a log file |
