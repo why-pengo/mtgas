@@ -8,6 +8,8 @@ Django web application for tracking and analyzing Magic: The Gathering Arena gam
 
 ## Build & Test Commands
 
+> **Convention**: always prefer `make` targets over invoking tools directly. Every common workflow has a target; use `.venv/bin/<tool>` only when you need flags or arguments that no `make` target exposes, and document why in the commit message.
+
 ### Setup
 ```bash
 make setup              # Install dev dependencies + run migrations (installs into .venv)
@@ -25,11 +27,15 @@ make import-log LOG=/path/to/Player.log  # Import MTGA log file (CLI)
 
 ### Testing
 ```bash
-.venv/bin/pytest                          # Run all tests
-.venv/bin/pytest tests/test_parser.py     # Run specific test file
-.venv/bin/pytest tests/test_models.py::TestMatchModel  # Run specific test class
-.venv/bin/pytest -k "test_parse_match"    # Run tests matching pattern
-.venv/bin/pytest --cov=stats --cov=src --cov=cards  # Run with coverage
+make test                   # Run all tests
+make test-verbose           # Run with verbose output and long tracebacks
+make test-cov               # Run with HTML + terminal coverage report
+make test-parser            # Run parser tests only
+make test-models            # Run model tests only
+make test-views             # Run view tests only
+# Need flags make doesn't expose? Call pytest directly (prefer make targets otherwise):
+.venv/bin/pytest tests/test_parser.py::TestMatchParsing  # specific class
+.venv/bin/pytest -k "test_parse_match"                   # pattern match
 ```
 
 ### Code Quality
@@ -164,9 +170,9 @@ LifeChange, ZoneTransfer
 
 ### Adding a New Model
 1. Add model to `stats/models.py`
-2. Run `python manage.py makemigrations`
+2. Run `make makemigrations`
 3. Review migration file
-4. Run `python manage.py migrate`
+4. Run `make migrate`
 5. Register in `stats/admin.py` if needed
 6. Add tests in `tests/test_models.py`
 
@@ -203,7 +209,8 @@ LifeChange, ZoneTransfer
 - Templates: `stats/templates/`, `cards/templates/`; JS: `stats/static/js/`
 
 ### `polyglot-test-agent`
-- Run tests with `.venv/bin/pytest` (not bare `pytest`)
+- Run tests with `make test` (preferred) or `make test-cov` for coverage
+- Use `.venv/bin/pytest <args>` only when you need flags not exposed by a make target (e.g., `-k` pattern or a specific class); never use bare `pytest`
 - Coverage targets: `--cov=stats --cov=src --cov=cards`
 - Test naming: `test_<function>_<scenario>`
 - Fixtures in `conftest.py`; test database is in-memory SQLite
