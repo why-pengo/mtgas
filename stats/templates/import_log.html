@@ -18,7 +18,7 @@
 
         <div class="card">
             <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+                <form id="import-form" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
                     
                     <div class="mb-4">
@@ -54,7 +54,7 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button type="submit" class="btn btn-primary btn-lg" id="import-submit-btn">
                             Import Log File(s)
                         </button>
                         <a href="{% url 'stats:import_sessions' %}" class="btn btn-secondary">

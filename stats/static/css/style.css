@@ -1508,3 +1508,22 @@ details > summary {
 [data-bs-theme="dark"] .analysis-severity-badge.severity-tip {
     color: #60a5fa;
 }
+
+/* ── Submit-button loading spinner ───────────────────────────────────────── */
+
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
+}
+
+.btn-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentcolor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.65s linear infinite;
+    vertical-align: -0.15em;
+    margin-right: 0.4em;
+    flex-shrink: 0;
+}

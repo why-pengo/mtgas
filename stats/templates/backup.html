@@ -45,7 +45,7 @@
                     of the uploaded file. This cannot be undone.
                 </div>
 
-                <form method="post" enctype="multipart/form-data">
+                <form id="restore-form" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
 
                     <div class="mb-4">
@@ -81,7 +81,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-danger">
+                    <button type="submit" class="btn btn-danger" id="restore-submit-btn">
                         Restore Backup
                     </button>
                 </form>

@@ -124,6 +124,23 @@
         });
     }
 
+    // -------------------------------------------------------------------------
+    // Submit-button loading spinner
+    // -------------------------------------------------------------------------
+    function initSubmitSpinner(formId, btnId, label) {
+        const form = document.getElementById(formId);
+        const btn  = document.getElementById(btnId);
+        if (!form || !btn) return;
+        form.addEventListener("submit", function () {
+            const spinner = document.createElement("span");
+            spinner.className = "btn-spinner";
+            spinner.setAttribute("aria-hidden", "true");
+
+            btn.disabled = true;
+            btn.replaceChildren(spinner, document.createTextNode(" " + label));
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         const current = document.documentElement.getAttribute("data-theme") || DARK;
         applyTheme(current);
@@ -139,6 +156,8 @@
         initCardPreviews();
         initCardZoom();
         initCopyCardName();
+        initSubmitSpinner("import-form", "import-submit-btn", "Importing\u2026");
+        initSubmitSpinner("restore-form", "restore-submit-btn", "Restoring\u2026");
     });
 })();
 
