@@ -5,9 +5,11 @@
 {% block content %}
 <div class="d-flex align-items-center gap-3 mb-4">
     <h1 class="mb-0">{{ paper_card.name }}</h1>
-    <button class="btn btn-sm btn-outline-secondary copy-name-btn"
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary copy-name-btn"
             data-name="{{ paper_card.name }}"
-            title="Copy card name to clipboard">⧉</button>
+            title="Copy card name to clipboard"
+            aria-label="Copy card name to clipboard">⧉</button>
     {% if paper_card.rarity %}
     <span class="badge
         {% if paper_card.rarity == 'mythic' %}bg-danger
@@ -91,17 +93,49 @@
 document.addEventListener('DOMContentLoaded', function () {
     const btn = document.querySelector('.copy-name-btn');
     if (!btn) return;
+
+    function showCopiedState() {
+        const original = btn.textContent;
+        btn.textContent = '✓';
+        btn.classList.add('copy-name-btn--copied');
+        setTimeout(function () {
+            btn.textContent = original;
+            btn.classList.remove('copy-name-btn--copied');
+        }, 1500);
+    }
+
+    function fallbackCopy(name) {
+        const textarea = document.createElement('textarea');
+        textarea.value = name;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showCopiedState();
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+
     btn.addEventListener('click', function () {
         const name = btn.dataset.name;
-        navigator.clipboard.writeText(name).then(function () {
-            const original = btn.textContent;
-            btn.textContent = '✓';
-            btn.classList.add('copy-name-btn--copied');
-            setTimeout(function () {
-                btn.textContent = original;
-                btn.classList.remove('copy-name-btn--copied');
-            }, 1500);
-        });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(name).then(function () {
+                showCopiedState();
+            }).catch(function (err) {
+                console.error('Clipboard write failed:', err);
+                fallbackCopy(name);
+            });
+        } else {
+            fallbackCopy(name);
+        }
     });
 });
 </script>

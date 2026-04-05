@@ -53,6 +53,11 @@ def add_paper_card(request):
                     )
                     if search_resp.status_code == 200:
                         candidates = search_resp.json().get("data", [])[:20]
+                        if not candidates:
+                            error = (
+                                f'Multiple cards match "{name}" but suggestions could not be loaded. '
+                                "Try a more specific name."
+                            )
                     else:
                         error = (
                             f'Multiple cards match "{name}" but suggestions could not be loaded. '

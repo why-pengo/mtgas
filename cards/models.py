@@ -43,14 +43,15 @@ class PaperCard(models.Model):
             "image_uri": image_uri,
         }
 
-        existing = cls.objects.filter(scryfall_id=data["id"]).first()
-        if existing:
+        paper_card, created = cls.objects.get_or_create(
+            scryfall_id=data["id"],
+            defaults={**metadata, "quantity": 1},
+        )
+        if not created:
             for field, value in metadata.items():
-                setattr(existing, field, value)
-            existing.quantity = models.F("quantity") + 1
-            existing.save()
-            existing.refresh_from_db()
-            return existing
-
-        return cls.objects.create(scryfall_id=data["id"], quantity=1, **metadata)
+                setattr(paper_card, field, value)
+            paper_card.quantity = models.F("quantity") + 1
+            paper_card.save()
+            paper_card.refresh_from_db()
+        return paper_card
 
