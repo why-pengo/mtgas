@@ -120,8 +120,7 @@ Run `make help` to see all available commands:
 | `make format` | Format code with black/isort |
 | `make lint` | Run flake8 linter |
 | `make lint-css` | Run stylelint on CSS |
-| `make check` | Run Python code quality checks |
-| `make check` | Run all checks including CSS |
+| `make check` | Run all checks: format, lint, and CSS (requires `npm install`) |
 | `make ci` | Run checks + tests (for CI) |
 | `make download-cards` | Download Scryfall data |
 | `make import-log LOG=path` | Import a log file |

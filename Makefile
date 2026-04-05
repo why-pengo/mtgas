@@ -3,7 +3,7 @@
 # This Makefile provides commands for common development tasks.
 # Run `make help` to see all available commands.
 
-.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log check-venv
+.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log
 
 # Default Python interpreter
 VENV := .venv
