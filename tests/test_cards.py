@@ -87,9 +87,10 @@ class TestPaperCardModel:
         assert card.scryfall_id == "bolt-0001"
         assert card.set_code == "tst"
         assert "cards.scryfall.io" in card.image_uri
+        assert card.quantity == 1
 
     def test_upsert_updates_existing_card(self, paper_card):
-        """upsert_from_scryfall updates an existing card with the same scryfall_id."""
+        """upsert_from_scryfall updates metadata on an existing card with the same scryfall_id."""
         from cards.models import PaperCard
 
         data = _scryfall_response("Wickerbough Elder Updated", paper_card.scryfall_id)
@@ -98,6 +99,28 @@ class TestPaperCardModel:
         paper_card.refresh_from_db()
         assert paper_card.name == "Wickerbough Elder Updated"
         assert PaperCard.objects.count() == 1
+
+    def test_upsert_increments_quantity_on_duplicate(self, paper_card):
+        """upsert_from_scryfall increments quantity when the same card is added again."""
+        from cards.models import PaperCard
+
+        assert paper_card.quantity == 1
+        data = _scryfall_response("Wickerbough Elder", paper_card.scryfall_id)
+        updated = PaperCard.upsert_from_scryfall(data)
+
+        assert updated.quantity == 2
+        assert PaperCard.objects.count() == 1
+
+    def test_upsert_increments_quantity_multiple_times(self, paper_card):
+        """upsert_from_scryfall correctly accumulates quantity across multiple adds."""
+        from cards.models import PaperCard
+
+        data = _scryfall_response("Wickerbough Elder", paper_card.scryfall_id)
+        PaperCard.upsert_from_scryfall(data)
+        PaperCard.upsert_from_scryfall(data)
+
+        paper_card.refresh_from_db()
+        assert paper_card.quantity == 3
 
     def test_upsert_handles_double_faced_card(self, db):
         """upsert_from_scryfall extracts image_uri from card_faces for DFCs."""
@@ -208,6 +231,7 @@ class TestAddPaperCardView:
     def test_post_with_unknown_name_shows_error(self, client, db):
         mock_resp = MagicMock()
         mock_resp.status_code = 404
+        mock_resp.json.return_value = {"type": "not_found", "code": "not_found"}
 
         with patch("cards.views.requests.get", return_value=mock_resp):
             response = client.post(reverse("cards:add_paper_card"), {"card_name": "Zzz Fake Card"})
@@ -216,7 +240,7 @@ class TestAddPaperCardView:
         assert b"No card found" in response.content
 
     def test_post_upserts_existing_paper_card(self, client, paper_card):
-        """Posting a name matching an existing PaperCard updates, doesn't duplicate."""
+        """Posting a name matching an existing PaperCard updates metadata and increments quantity."""
         from cards.models import PaperCard
 
         scryfall_data = _scryfall_response("Wickerbough Elder Updated", paper_card.scryfall_id)
@@ -228,3 +252,73 @@ class TestAddPaperCardView:
             client.post(reverse("cards:add_paper_card"), {"card_name": "Wickerbough Elder"})
 
         assert PaperCard.objects.count() == 1
+        paper_card.refresh_from_db()
+        assert paper_card.quantity == 2
+
+    def test_post_ambiguous_name_shows_candidate_pick_list(self, client, db):
+        """When Scryfall returns type=ambiguous, a pick-list of candidates is shown."""
+        ambiguous_resp = MagicMock()
+        ambiguous_resp.status_code = 404
+        ambiguous_resp.json.return_value = {"type": "ambiguous", "code": "not_found"}
+
+        candidates = [
+            _scryfall_response("Lightning Bolt", "bolt-001"),
+            _scryfall_response("Lightning Strike", "strike-001"),
+        ]
+        search_resp = MagicMock()
+        search_resp.status_code = 200
+        search_resp.json.return_value = {"data": candidates}
+
+        with patch("cards.views.requests.get", side_effect=[ambiguous_resp, search_resp]):
+            response = client.post(reverse("cards:add_paper_card"), {"card_name": "lightning"})
+
+        assert response.status_code == 200
+        assert b"Multiple matches found" in response.content
+        assert b"Lightning Bolt" in response.content
+        assert b"Lightning Strike" in response.content
+
+    def test_post_ambiguous_search_fails_shows_error(self, client, db):
+        """When Scryfall is ambiguous and the search fallback also fails, show error."""
+        ambiguous_resp = MagicMock()
+        ambiguous_resp.status_code = 404
+        ambiguous_resp.json.return_value = {"type": "ambiguous", "code": "not_found"}
+
+        search_resp = MagicMock()
+        search_resp.status_code = 503
+
+        with patch("cards.views.requests.get", side_effect=[ambiguous_resp, search_resp]):
+            response = client.post(reverse("cards:add_paper_card"), {"card_name": "lightning"})
+
+        assert response.status_code == 200
+        assert b"suggestions could not be loaded" in response.content
+
+    def test_post_with_scryfall_id_saves_card_and_redirects(self, client, db):
+        """Posting a scryfall_id (from pick-list) fetches by ID, saves, and redirects."""
+        from cards.models import PaperCard
+
+        scryfall_data = _scryfall_response("Lightning Bolt", "bolt-0001")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = scryfall_data
+
+        with patch("cards.views.requests.get", return_value=mock_resp):
+            response = client.post(
+                reverse("cards:add_paper_card"), {"scryfall_id": "bolt-0001"}, follow=False
+            )
+
+        assert response.status_code == 302
+        card = PaperCard.objects.get(scryfall_id="bolt-0001")
+        assert response["Location"] == reverse("cards:paper_card_detail", kwargs={"pk": card.pk})
+
+    def test_post_with_scryfall_id_fetch_failure_shows_error(self, client, db):
+        """When fetching by scryfall_id fails, an error is shown."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+
+        with patch("cards.views.requests.get", return_value=mock_resp):
+            response = client.post(
+                reverse("cards:add_paper_card"), {"scryfall_id": "bad-id"}, follow=False
+            )
+
+        assert response.status_code == 200
+        assert b"Could not fetch" in response.content

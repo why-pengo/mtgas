@@ -26,6 +26,7 @@
                     <th data-sortable data-sort-type="text">Type <span class="sort-indicator">⇅</span></th>
                     <th data-sortable data-sort-type="text">Set <span class="sort-indicator">⇅</span></th>
                     <th data-sortable data-sort-type="text">Rarity <span class="sort-indicator">⇅</span></th>
+                    <th data-sortable data-sort-type="number" class="text-center">Qty <span class="sort-indicator">⇅</span></th>
                     <th class="text-center">Link</th>
                 </tr>
             </thead>
@@ -45,9 +46,10 @@
                     <td>{{ pc.type_line|default:"—" }}</td>
                     <td>{{ pc.set_code|upper|default:"—" }}</td>
                     <td>{{ pc.rarity|default:"—"|capfirst }}</td>
+                    <td class="text-center">{{ pc.quantity }}</td>
                     <td class="text-center">
                         {% if pc.scryfall_id %}
-                        <a href="https://scryfall.com/search?q=id:{{ pc.scryfall_id }}"
+                        <a href="https://scryfall.com/card/{{ pc.scryfall_id }}"
                            target="_blank" rel="noopener noreferrer"
                            class="scryfall-link" title="View on Scryfall">⬡</a>
                         {% else %}—{% endif %}
@@ -145,6 +147,20 @@ document.addEventListener('DOMContentLoaded', function () {
             row.style.display = (!query || text.includes(query)) ? '' : 'none';
         });
         updateCount();
+    });
+
+    /* ── Hotkeys ─────────────────────────────────────────────────── */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === '/' && document.activeElement !== searchInput) {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+            searchInput.blur();
+        }
     });
 });
 </script>
