@@ -3,7 +3,16 @@
 # This Makefile provides commands for common development tasks.
 # Run `make help` to see all available commands.
 
-.PHONY: help install-dev setup migrate run test lint format check clean download-cards import-log
+.PHONY: help check-venv install-dev setup migrate makemigrations resetdb run shell createsuperuser \
+        test test-verbose test-cov test-parser test-models test-views \
+        format format-check lint lint-css lint-css-fix check ci \
+        download-cards import-log import-default \
+        docker-build docker-up docker-down \
+        clean clean-all
+
+# Git metadata for Docker image tagging
+GIT_BRANCH := $(or $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-'),local)
+GIT_SHA    := $(or $(shell git rev-parse --short HEAD 2>/dev/null),dev)
 
 # Default Python interpreter
 VENV := .venv
@@ -170,6 +179,24 @@ test-models: check-venv ## Run only model tests
 
 test-views: check-venv ## Run only view tests
 	$(VENV_BIN)/pytest tests/test_views.py -v
+
+# =============================================================================
+# Docker
+# =============================================================================
+
+docker-build: ## Build the dev container image tagged with branch and commit SHA
+	@echo "$(BLUE)Building Docker image: mtgas:$(GIT_BRANCH)-$(GIT_SHA)$(NC)"
+	GIT_BRANCH=$(GIT_BRANCH) GIT_SHA=$(GIT_SHA) docker compose build
+	@echo "$(GREEN)Image built: mtgas:$(GIT_BRANCH)-$(GIT_SHA)$(NC)"
+
+docker-up: ## Start all services, rebuilding the image if the build context changed
+	@echo "$(BLUE)Starting services (mtgas:$(GIT_BRANCH)-$(GIT_SHA))...$(NC)"
+	GIT_BRANCH=$(GIT_BRANCH) GIT_SHA=$(GIT_SHA) docker compose up --build
+
+docker-down: ## Stop and remove containers
+	@echo "$(BLUE)Stopping services...$(NC)"
+	docker compose down
+	@echo "$(GREEN)Services stopped$(NC)"
 
 # =============================================================================
 # Cleanup
