@@ -24,7 +24,7 @@ The defaults work out of the box for local development.
 make docker-up
 ```
 
-This exports the current git branch and short commit SHA, then starts `web` and `postgres`. The built image is tagged `mtgas:<branch>-<sha>` (e.g. `mtgas:main-a1b2c3d`).
+This exports the current git branch and short commit SHA, builds the image (rebuilding automatically if the Dockerfile or build context changed), then starts `web` and `postgres`. The built image is tagged `mtgas:<branch>-<sha>` (e.g. `mtgas:main-a1b2c3d`).
 
 To build the image without starting services:
 
