@@ -3,7 +3,7 @@
 # This Makefile provides commands for common development tasks.
 # Run `make help` to see all available commands.
 
-.PHONY: help install install-dev setup migrate run test lint format check clean download-cards import-log
+.PHONY: help install install-dev setup migrate run test lint format check clean download-cards import-log check-venv
 
 # Default Python interpreter
 VENV := .venv
@@ -25,6 +25,13 @@ help: ## Show this help message
 	@echo "$(GREEN)Available commands:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
+
+check-venv: ## Verify .venv exists; fail fast with a helpful message if not
+	@if [ ! -x "$(PYTHON)" ]; then \
+		echo "$(RED)Error: virtual environment not found at $(VENV)/$(NC)"; \
+		echo "$(YELLOW)Run 'make setup' to create it and install dependencies.$(NC)"; \
+		exit 1; \
+	fi
 
 # =============================================================================
 # Environment Setup
@@ -55,17 +62,17 @@ setup: install-dev migrate ## Full setup: install deps and initialize database
 # Database
 # =============================================================================
 
-migrate: ## Run database migrations
+migrate: check-venv ## Run database migrations
 	@echo "$(BLUE)Running database migrations...$(NC)"
 	$(PYTHON) manage.py migrate
 	@echo "$(GREEN)Migrations complete$(NC)"
 
-makemigrations: ## Create new migrations
+makemigrations: check-venv ## Create new migrations
 	@echo "$(BLUE)Creating migrations...$(NC)"
 	$(PYTHON) manage.py makemigrations
 	@echo "$(GREEN)Migrations created$(NC)"
 
-resetdb: ## Reset database (WARNING: destroys all data)
+resetdb: check-venv ## Reset database (WARNING: destroys all data)
 	@echo "$(RED)WARNING: This will delete all data!$(NC)"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	rm -f data/mtga_stats.db
@@ -76,28 +83,28 @@ resetdb: ## Reset database (WARNING: destroys all data)
 # Application
 # =============================================================================
 
-run: ## Run development server
+run: check-venv ## Run development server
 	@echo "$(BLUE)Starting development server...$(NC)"
 	@echo "$(GREEN)Open http://127.0.0.1:8000/ in your browser$(NC)"
 	$(PYTHON) manage.py runserver
 
-shell: ## Open Django shell
+shell: check-venv ## Open Django shell
 	$(PYTHON) manage.py shell
 
-createsuperuser: ## Create admin superuser
+createsuperuser: check-venv ## Create admin superuser
 	$(PYTHON) manage.py createsuperuser
 
 # =============================================================================
 # Data Import
 # =============================================================================
 
-download-cards: ## Download Scryfall bulk card data
+download-cards: check-venv ## Download Scryfall bulk card data
 	@echo "$(BLUE)Downloading Scryfall card data...$(NC)"
 	@echo "$(YELLOW)This may take a few minutes (~350MB download)$(NC)"
 	$(PYTHON) manage.py download_cards
 	@echo "$(GREEN)Card data downloaded$(NC)"
 
-import-log: ## Import Player.log file (usage: make import-log LOG=/path/to/Player.log)
+import-log: check-venv ## Import Player.log file (usage: make import-log LOG=/path/to/Player.log)
 ifndef LOG
 	@echo "$(RED)Error: LOG path not specified$(NC)"
 	@echo "Usage: make import-log LOG=/path/to/Player.log"
@@ -107,7 +114,7 @@ endif
 	$(PYTHON) manage.py import_log $(LOG)
 	@echo "$(GREEN)Import complete$(NC)"
 
-import-default: ## Import default log file (data/Player.log)
+import-default: check-venv ## Import default log file (data/Player.log)
 	@echo "$(BLUE)Importing data/Player.log...$(NC)"
 	$(PYTHON) manage.py import_log data/Player.log
 	@echo "$(GREEN)Import complete$(NC)"
@@ -116,20 +123,20 @@ import-default: ## Import default log file (data/Player.log)
 # Code Quality
 # =============================================================================
 
-format: ## Format code with black and isort
+format: check-venv ## Format code with black and isort
 	@echo "$(BLUE)Formatting code with isort...$(NC)"
 	$(VENV_BIN)/isort src/ stats/ tests/ mtgas_project/
 	@echo "$(BLUE)Formatting code with black...$(NC)"
 	$(VENV_BIN)/black src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Code formatted$(NC)"
 
-format-check: ## Check code formatting without making changes
+format-check: check-venv ## Check code formatting without making changes
 	@echo "$(BLUE)Checking code formatting...$(NC)"
 	$(VENV_BIN)/isort --check-only --diff src/ stats/ tests/ mtgas_project/
 	$(VENV_BIN)/black --check --diff src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Format check complete$(NC)"
 
-lint: ## Run flake8 linter
+lint: check-venv ## Run flake8 linter
 	@echo "$(BLUE)Running flake8 linter...$(NC)"
 	$(VENV_BIN)/flake8 src/ stats/ tests/ mtgas_project/
 	@echo "$(GREEN)Linting complete$(NC)"
@@ -151,28 +158,28 @@ check: format-check lint lint-css ## Run all code quality checks (format + lint)
 # Testing
 # =============================================================================
 
-test: ## Run all tests
+test: check-venv ## Run all tests
 	@echo "$(BLUE)Running tests...$(NC)"
 	$(VENV_BIN)/pytest
 	@echo "$(GREEN)Tests complete$(NC)"
 
-test-verbose: ## Run tests with verbose output
+test-verbose: check-venv ## Run tests with verbose output
 	@echo "$(BLUE)Running tests (verbose)...$(NC)"
 	$(VENV_BIN)/pytest -v --tb=long
 	@echo "$(GREEN)Tests complete$(NC)"
 
-test-cov: ## Run tests with coverage report
+test-cov: check-venv ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage...$(NC)"
 	$(VENV_BIN)/pytest --cov=stats --cov=src --cov-report=html --cov-report=term
 	@echo "$(GREEN)Coverage report generated in htmlcov/$(NC)"
 
-test-parser: ## Run only parser tests
+test-parser: check-venv ## Run only parser tests
 	$(VENV_BIN)/pytest tests/test_parser.py -v
 
-test-models: ## Run only model tests
+test-models: check-venv ## Run only model tests
 	$(VENV_BIN)/pytest tests/test_models.py -v
 
-test-views: ## Run only view tests
+test-views: check-venv ## Run only view tests
 	$(VENV_BIN)/pytest tests/test_views.py -v
 
 # =============================================================================
