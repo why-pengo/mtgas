@@ -7,7 +7,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 1. Fork the repository
 2. Clone your fork locally
 3. Set up the development environment (see below)
-4. Create a feature branch from `main`
+4. Create a feature branch from `develop` (see [Branch & PR Conventions](#branch--pr-conventions))
 
 ## Development Setup
 
@@ -89,33 +89,38 @@ All new features should include tests:
 # Run all tests
 make test
 
-# Run with coverage
+# Run with coverage report
 make test-cov
 
-# Run specific tests
-pytest tests/test_parser.py -v
+# Run with verbose output
+make test-verbose
+
+# Run specific test files
+make test-parser   # parser tests only
+make test-models   # model tests only
+make test-views    # view tests only
 ```
 
 ## Pull Request Process
 
-1. **Create a branch**: `git checkout -b feature/your-feature-name`
+1. **Create a branch** from `develop` using the `issue-{number}-{short-description}` naming convention (see [Branch & PR Conventions](#branch--pr-conventions))
 
 2. **Make changes**: Follow code standards
 
 3. **Test**: Ensure `make ci` passes
 
-4. **Commit**: Use descriptive commit messages
+4. **Commit**: Use conventional commit prefixes:
    - `feat:` for new features
    - `fix:` for bug fixes
    - `docs:` for documentation
    - `test:` for tests
    - `refactor:` for refactoring
 
-5. **Push**: `git push origin feature/your-feature-name`
+5. **Push**: `git push origin issue-{number}-{short-description}`
 
-6. **Open PR**: Submit a pull request with:
+6. **Open PR** targeting `develop` with:
    - Clear description of changes
-   - Link to related issues
+   - Link to the related issue (`Closes #N`)
    - Screenshots for UI changes
 
 ## Project Structure
@@ -131,6 +136,82 @@ pytest tests/test_parser.py -v
 - Update `README.md` for user-facing changes
 - Update `docs/` for technical documentation
 - Add docstrings to new functions/classes
+
+## Branch & PR Conventions
+
+Every piece of work must follow this branching model:
+
+| Rule | Detail |
+|------|--------|
+| **Branch base** | Always cut from `develop` — never from `main` |
+| **Branch name** | `issue-{number}-{short-description}` — e.g., `issue-34-import-spinner` |
+| **PR target** | Always target `develop` — never `main` |
+| **Merging to `main`** | Only via a release PR from `develop` |
+| **CI gate** | `make ci` must pass before merging |
+| **Issue link** | Every branch must be linked to a GitHub issue; create one first if none exists |
+
+```bash
+# Start work on issue #42
+git checkout develop
+git pull
+git checkout -b issue-42-my-feature
+# … make changes …
+make ci
+git push -u origin issue-42-my-feature
+# Open PR targeting develop on GitHub
+```
+
+## Documenting Feature Changes
+
+After every code change, update **every** doc file that describes the affected feature:
+
+| File | When to update |
+|------|---------------|
+| `README.md` | User-facing features, routes, setup steps |
+| `QUICKSTART.md` | Quick-start commands or first-run steps |
+| `docs/DATABASE_SCHEMA.md` | Model or schema changes |
+| `docs/DEVELOPMENT.md` | Dev workflow, commands, or architecture changes |
+| `docs/LOG_PARSING.md` | Parser changes or new event types |
+| `docs/LOGGING.md` | Logging config or logger-name changes |
+| `docs/MATCH_REPLAY.md` | Match replay or game-action changes |
+
+**Rule**: if your commit adds, removes, or changes a feature, model, route, management command, or configuration value that is described in any of the files above, update that file in the **same commit**. Do not leave docs stale.
+
+## Using Copilot to Work on Issues
+
+### Writing a good issue
+
+Clear issues produce better results from both humans and Copilot. Follow the templates below.
+
+**Bug report**
+- Title: short and specific — *"Import fails when log has duplicate match IDs"*
+- Body: steps to reproduce, expected vs. actual behaviour, environment, full traceback in a fenced code block
+- Labels: `bug`
+
+**Feature request**
+- Title: action-oriented — *"Add deck win-rate chart to dashboard"*
+- Body: problem statement, proposed solution, alternatives considered, acceptance criteria
+- Labels: `enhancement`
+
+**General rules**: one issue = one concern; link related issues/PRs with `#N`; add screenshots or logs.
+
+```markdown
+### Acceptance Criteria
+- [ ] <observable outcome 1>
+- [ ] <observable outcome 2>
+- [ ] Tests cover the new behaviour
+```
+
+### Picking up an issue with Copilot
+
+Copilot reads `.github/copilot-instructions.md` for project-specific conventions. To start work on an existing issue:
+
+1. Reference the issue number when prompting — e.g., *"Let's work on issue #42"*
+2. Copilot will create the branch `issue-42-{description}` from `develop` automatically
+3. All commits and the PR description will reference the issue
+4. Copilot will run `make ci` before pushing and will open the PR targeting `develop`
+
+To write a new issue before handing it to Copilot, follow the templates above and include clear acceptance criteria — Copilot uses them to know when the task is complete.
 
 ## Questions?
 
