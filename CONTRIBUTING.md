@@ -87,13 +87,18 @@ All new features should include tests:
 
 ```bash
 # Run all tests
-.venv/bin/pytest
+make test
 
-# Run with coverage
-.venv/bin/pytest --cov=stats --cov=src --cov=cards
+# Run with coverage report
+make test-cov
 
-# Run specific tests
-.venv/bin/pytest tests/test_parser.py -v
+# Run with verbose output
+make test-verbose
+
+# Run specific test files
+make test-parser   # parser tests only
+make test-models   # model tests only
+make test-views    # view tests only
 ```
 
 ## Pull Request Process
